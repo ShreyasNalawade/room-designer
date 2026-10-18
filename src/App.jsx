@@ -362,6 +362,8 @@ export default function App() {
           {selectedItem && (
             <MobileActionBar
               selectedItem={selectedItem}
+              room={room}
+              items={items}
               unit={unit}
               onRotate={handleRotate}
               onDuplicate={handleDuplicateItem}
@@ -378,6 +380,7 @@ export default function App() {
         <RightPropertiesPanel
           room={room}
           unit={unit}
+          items={items}
           selectedItem={selectedItem}
           isOverlapping={selectedId ? overlappingIds.has(selectedId) : false}
           isOutside={selectedId ? outsideIds.has(selectedId) : false}
@@ -430,6 +433,7 @@ export default function App() {
             <RightPropertiesPanel
               room={room}
               unit={unit}
+              items={items}
               selectedItem={selectedItem}
               isOverlapping={selectedId ? overlappingIds.has(selectedId) : false}
               isOutside={selectedId ? outsideIds.has(selectedId) : false}

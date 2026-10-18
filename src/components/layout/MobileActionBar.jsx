@@ -12,9 +12,12 @@ import {
   Sliders,
 } from 'lucide-react';
 import { formatMeasurement } from '../../utils/units';
+import { calculateWallClearances, calculateSpaceUtilization } from '../../utils/measurements';
 
 export default function MobileActionBar({
   selectedItem,
+  room,
+  items = [],
   unit,
   onRotate,
   onDuplicate,
@@ -27,9 +30,11 @@ export default function MobileActionBar({
   if (!selectedItem) return null;
 
   const isLocked = !!selectedItem.locked;
+  const clearances = room ? calculateWallClearances(selectedItem, room, unit) : null;
+  const spaceUtil = room ? calculateSpaceUtilization(room, items, unit) : null;
 
   return (
-    <div className="absolute bottom-16 sm:bottom-12 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2.5 space-y-2 select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
+    <div className="lg:hidden absolute bottom-16 sm:bottom-12 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-2.5 space-y-2 select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
       {/* Top Header: Selected Item Name, Dimensions & Close */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2 overflow-hidden">
@@ -55,6 +60,32 @@ export default function MobileActionBar({
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Live Wall Clearances & Empty Space Badge */}
+      {clearances && spaceUtil && (
+        <div className="flex items-center justify-between text-[10px] bg-slate-950/80 border border-slate-800/80 rounded-lg px-2.5 py-1 font-mono text-slate-300">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <span className="text-cyan-400 font-semibold truncate">
+              N: {clearances.northStr}
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400 truncate">
+              S: {clearances.southStr}
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400 truncate">
+              W: {clearances.westStr}
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400 truncate">
+              E: {clearances.eastStr}
+            </span>
+          </div>
+          <span className="text-emerald-400 font-semibold pl-1.5 shrink-0">
+            {spaceUtil.freeSpacePercent}% Free
+          </span>
+        </div>
+      )}
 
       {/* Main Touch Actions Row */}
       <div className="grid grid-cols-5 gap-1.5 pt-1 border-t border-slate-800/80">

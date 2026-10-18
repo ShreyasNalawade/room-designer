@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Text, Group, Circle } from 'react-konva';
-import { Maximize2, RotateCcw, ZoomIn, ZoomOut, Grid as GridIcon, Move } from 'lucide-react';
+import { Maximize2, RotateCcw, ZoomIn, ZoomOut, Grid as GridIcon, Move, Ruler } from 'lucide-react';
 import FurnitureItem from './FurnitureItem';
 import { formatMeasurement, calculateRoomMetrics } from '../../utils/units';
+import { calculateWallClearances } from '../../utils/measurements';
 
 // Base conversion: 0.1 screen pixels per canonical millimeter (100px per meter)
 const BASE_PX_PER_MM = 0.1;
@@ -29,6 +30,7 @@ export default function RoomCanvas({
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageScale, setStageScale] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
+  const [showGuidelines, setShowGuidelines] = useState(true);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -265,6 +267,15 @@ export default function RoomCanvas({
     ];
   }, [halfTopW, halfBottomW, halfL, t]);
 
+  // Selected item & real-time wall clearance dimensions
+  const selectedItem = useMemo(() => {
+    return items.find((i) => i.id === selectedId) || null;
+  }, [items, selectedId]);
+
+  const wallClearances = useMemo(() => {
+    return selectedItem ? calculateWallClearances(selectedItem, room, unit) : null;
+  }, [selectedItem, room, unit]);
+
   return (
     <div
       ref={containerRef}
@@ -323,6 +334,17 @@ export default function RoomCanvas({
           }`}
         >
           <GridIcon className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowGuidelines((v) => !v)}
+          title={showGuidelines ? 'Hide Wall Clearances' : 'Show Wall Clearances'}
+          aria-label={showGuidelines ? 'Hide Wall Clearances' : 'Show Wall Clearances'}
+          className={`p-1.5 sm:p-2 rounded transition cursor-pointer touch-manipulation ${
+            showGuidelines ? 'bg-slate-800 text-cyan-400' : 'hover:bg-slate-800 text-slate-500'
+          }`}
+        >
+          <Ruler className="w-4 h-4" />
         </button>
       </div>
 
@@ -605,6 +627,277 @@ export default function RoomCanvas({
             />
           ))}
         </Layer>
+
+        {/* Layer 4: CAD Wall Clearance Dimension Guidelines for Selected Item */}
+        {showGuidelines && selectedItem && wallClearances && (
+          <Layer listening={false}>
+            {/* North Wall Dimension Line */}
+            {wallClearances.boundingBox.minY * BASE_PX_PER_MM > -halfL && (
+              <Group>
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM,
+                    -halfL,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM,
+                    wallClearances.boundingBox.minY * BASE_PX_PER_MM,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={1.5 / stageScale}
+                  dash={[4 / stageScale, 4 / stageScale]}
+                  opacity={0.85}
+                />
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM - 6 / stageScale,
+                    -halfL,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM + 6 / stageScale,
+                    -halfL,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={2 / stageScale}
+                />
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM - 6 / stageScale,
+                    wallClearances.boundingBox.minY * BASE_PX_PER_MM,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM + 6 / stageScale,
+                    wallClearances.boundingBox.minY * BASE_PX_PER_MM,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={2 / stageScale}
+                />
+                <Group
+                  x={wallClearances.boundingBox.centerX * BASE_PX_PER_MM}
+                  y={(-halfL + wallClearances.boundingBox.minY * BASE_PX_PER_MM) / 2}
+                  scaleX={1 / stageScale}
+                  scaleY={1 / stageScale}
+                >
+                  <Rect
+                    x={-48}
+                    y={-10}
+                    width={96}
+                    height={20}
+                    fill="#030712"
+                    stroke="#0284c7"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                    shadowColor="#000"
+                    shadowBlur={4}
+                    shadowOpacity={0.6}
+                  />
+                  <Text
+                    text={`N: ${wallClearances.northStr}`}
+                    x={-48}
+                    y={-6}
+                    width={96}
+                    align="center"
+                    fontSize={10}
+                    fontFamily="JetBrains Mono, monospace"
+                    fontStyle="700"
+                    fill="#38bdf8"
+                  />
+                </Group>
+              </Group>
+            )}
+
+            {/* South Wall Dimension Line */}
+            {wallClearances.boundingBox.maxY * BASE_PX_PER_MM < halfL && (
+              <Group>
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM,
+                    wallClearances.boundingBox.maxY * BASE_PX_PER_MM,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM,
+                    halfL,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={1.5 / stageScale}
+                  dash={[4 / stageScale, 4 / stageScale]}
+                  opacity={0.85}
+                />
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM - 6 / stageScale,
+                    halfL,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM + 6 / stageScale,
+                    halfL,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={2 / stageScale}
+                />
+                <Line
+                  points={[
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM - 6 / stageScale,
+                    wallClearances.boundingBox.maxY * BASE_PX_PER_MM,
+                    wallClearances.boundingBox.centerX * BASE_PX_PER_MM + 6 / stageScale,
+                    wallClearances.boundingBox.maxY * BASE_PX_PER_MM,
+                  ]}
+                  stroke="#38bdf8"
+                  strokeWidth={2 / stageScale}
+                />
+                <Group
+                  x={wallClearances.boundingBox.centerX * BASE_PX_PER_MM}
+                  y={(wallClearances.boundingBox.maxY * BASE_PX_PER_MM + halfL) / 2}
+                  scaleX={1 / stageScale}
+                  scaleY={1 / stageScale}
+                >
+                  <Rect
+                    x={-48}
+                    y={-10}
+                    width={96}
+                    height={20}
+                    fill="#030712"
+                    stroke="#0284c7"
+                    strokeWidth={1}
+                    cornerRadius={4}
+                    shadowColor="#000"
+                    shadowBlur={4}
+                    shadowOpacity={0.6}
+                  />
+                  <Text
+                    text={`S: ${wallClearances.southStr}`}
+                    x={-48}
+                    y={-6}
+                    width={96}
+                    align="center"
+                    fontSize={10}
+                    fontFamily="JetBrains Mono, monospace"
+                    fontStyle="700"
+                    fill="#38bdf8"
+                  />
+                </Group>
+              </Group>
+            )}
+
+            {/* West Wall Dimension Line */}
+            {(() => {
+              const itemCenterY = wallClearances.boundingBox.centerY * BASE_PX_PER_MM;
+              const leftWallX = isTrapezoid
+                ? -(topWPx + ((itemCenterY + halfL) / lengthPx) * (bottomWPx - topWPx)) / 2
+                : -halfTopW;
+              const itemLeftX = wallClearances.boundingBox.minX * BASE_PX_PER_MM;
+
+              if (itemLeftX <= leftWallX) return null;
+
+              return (
+                <Group>
+                  <Line
+                    points={[leftWallX, itemCenterY, itemLeftX, itemCenterY]}
+                    stroke="#38bdf8"
+                    strokeWidth={1.5 / stageScale}
+                    dash={[4 / stageScale, 4 / stageScale]}
+                    opacity={0.85}
+                  />
+                  <Line
+                    points={[leftWallX, itemCenterY - 6 / stageScale, leftWallX, itemCenterY + 6 / stageScale]}
+                    stroke="#38bdf8"
+                    strokeWidth={2 / stageScale}
+                  />
+                  <Line
+                    points={[itemLeftX, itemCenterY - 6 / stageScale, itemLeftX, itemCenterY + 6 / stageScale]}
+                    stroke="#38bdf8"
+                    strokeWidth={2 / stageScale}
+                  />
+                  <Group
+                    x={(leftWallX + itemLeftX) / 2}
+                    y={itemCenterY}
+                    scaleX={1 / stageScale}
+                    scaleY={1 / stageScale}
+                  >
+                    <Rect
+                      x={-48}
+                      y={-10}
+                      width={96}
+                      height={20}
+                      fill="#030712"
+                      stroke="#0284c7"
+                      strokeWidth={1}
+                      cornerRadius={4}
+                      shadowColor="#000"
+                      shadowBlur={4}
+                      shadowOpacity={0.6}
+                    />
+                    <Text
+                      text={`W: ${wallClearances.westStr}`}
+                      x={-48}
+                      y={-6}
+                      width={96}
+                      align="center"
+                      fontSize={10}
+                      fontFamily="JetBrains Mono, monospace"
+                      fontStyle="700"
+                      fill="#38bdf8"
+                    />
+                  </Group>
+                </Group>
+              );
+            })()}
+
+            {/* East Wall Dimension Line */}
+            {(() => {
+              const itemCenterY = wallClearances.boundingBox.centerY * BASE_PX_PER_MM;
+              const rightWallX = isTrapezoid
+                ? (topWPx + ((itemCenterY + halfL) / lengthPx) * (bottomWPx - topWPx)) / 2
+                : halfTopW;
+              const itemRightX = wallClearances.boundingBox.maxX * BASE_PX_PER_MM;
+
+              if (itemRightX >= rightWallX) return null;
+
+              return (
+                <Group>
+                  <Line
+                    points={[itemRightX, itemCenterY, rightWallX, itemCenterY]}
+                    stroke="#38bdf8"
+                    strokeWidth={1.5 / stageScale}
+                    dash={[4 / stageScale, 4 / stageScale]}
+                    opacity={0.85}
+                  />
+                  <Line
+                    points={[itemRightX, itemCenterY - 6 / stageScale, itemRightX, itemCenterY + 6 / stageScale]}
+                    stroke="#38bdf8"
+                    strokeWidth={2 / stageScale}
+                  />
+                  <Line
+                    points={[rightWallX, itemCenterY - 6 / stageScale, rightWallX, itemCenterY + 6 / stageScale]}
+                    stroke="#38bdf8"
+                    strokeWidth={2 / stageScale}
+                  />
+                  <Group
+                    x={(itemRightX + rightWallX) / 2}
+                    y={itemCenterY}
+                    scaleX={1 / stageScale}
+                    scaleY={1 / stageScale}
+                  >
+                    <Rect
+                      x={-48}
+                      y={-10}
+                      width={96}
+                      height={20}
+                      fill="#030712"
+                      stroke="#0284c7"
+                      strokeWidth={1}
+                      cornerRadius={4}
+                      shadowColor="#000"
+                      shadowBlur={4}
+                      shadowOpacity={0.6}
+                    />
+                    <Text
+                      text={`E: ${wallClearances.eastStr}`}
+                      x={-48}
+                      y={-6}
+                      width={96}
+                      align="center"
+                      fontSize={10}
+                      fontFamily="JetBrains Mono, monospace"
+                      fontStyle="700"
+                      fill="#38bdf8"
+                    />
+                  </Group>
+                </Group>
+              );
+            })()}
+          </Layer>
+        )}
       </Stage>
     </div>
   );
