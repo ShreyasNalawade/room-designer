@@ -3,6 +3,8 @@ import HeaderToolbar from './components/layout/HeaderToolbar';
 import LeftSidebar from './components/layout/LeftSidebar';
 import RightPropertiesPanel from './components/layout/RightPropertiesPanel';
 import StatusBar from './components/layout/StatusBar';
+import MobileNavBar from './components/layout/MobileNavBar';
+import MobileActionBar from './components/layout/MobileActionBar';
 import RoomCanvas from './components/canvas/RoomCanvas';
 import { validateRoomDimensions } from './utils/validation';
 import { analyzeItemCollisions } from './utils/collision';
@@ -51,13 +53,14 @@ export default function App() {
     return saved?.savedAt || null;
   });
 
+  const [activeDrawer, setActiveDrawer] = useState(null); // 'furniture' | 'room' | 'inspector' | null
   const [toast, setToast] = useState(null);
   const canvasRef = useRef(null);
 
-  // Auto-dismiss toast after 4 seconds
+  // Auto-dismiss toast after 3.5 seconds
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 4000);
+    const timer = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -207,6 +210,45 @@ export default function App() {
     setSelectedId((prev) => (prev === itemId ? null : prev));
   }, []);
 
+  // Rotate selected item
+  const handleRotate = useCallback(
+    (deg) => {
+      if (!selectedItem || selectedItem.locked) return;
+      const next = ((selectedItem.rotation || 0) + deg) % 360;
+      handleChangeItem({
+        ...selectedItem,
+        rotation: next < 0 ? next + 360 : next,
+      });
+    },
+    [selectedItem]
+  );
+
+  // Toggle lock state
+  const handleToggleLock = useCallback((item) => {
+    handleChangeItem({
+      ...item,
+      locked: !item.locked,
+    });
+  }, []);
+
+  // Nudge item position
+  const handleNudge = useCallback(
+    (dx, dy) => {
+      if (!selectedItem || selectedItem.locked) return;
+      handleChangeItem({
+        ...selectedItem,
+        x: selectedItem.x + dx,
+        y: selectedItem.y + dy,
+      });
+    },
+    [selectedItem]
+  );
+
+  // Fit to screen view
+  const handleFitToView = useCallback(() => {
+    canvasRef.current?.fitToView?.();
+  }, []);
+
   // Global keyboard shortcuts (Esc, Delete, Ctrl+D, Arrow nudge)
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -217,6 +259,7 @@ export default function App() {
 
       if (e.key === 'Escape') {
         setSelectedId(null);
+        setActiveDrawer(null);
         return;
       }
 
@@ -264,13 +307,13 @@ export default function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans relative">
       {/* Toast Notification Banner */}
       {toast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-top-2 duration-200 text-xs font-medium bg-slate-900/95 border-slate-700 text-slate-100">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-top-2 duration-200 text-xs font-medium bg-slate-900/95 border-slate-700 text-slate-100 max-w-[90vw]">
           {toast.type === 'success' ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           ) : (
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           )}
-          <span>{toast.message}</span>
+          <span className="truncate">{toast.message}</span>
         </div>
       )}
 
@@ -289,7 +332,7 @@ export default function App() {
 
       {/* 2. Main Workspace Layout */}
       <main className="flex-1 flex flex-row overflow-hidden relative">
-        {/* Left Panel: Tabs for Furniture Catalog & Room Shape Builder */}
+        {/* Desktop Left Panel (Hidden on screens < lg) */}
         <LeftSidebar
           room={room}
           unit={unit}
@@ -300,7 +343,7 @@ export default function App() {
           placedItemsCount={items.length}
         />
 
-        {/* Central Canvas Viewport: Scaled 2D Konva Floor Plan */}
+        {/* Central Canvas Viewport: Full 100% width on Mobile! */}
         <section className="flex-1 h-full relative overflow-hidden flex flex-col">
           <RoomCanvas
             room={room}
@@ -314,9 +357,24 @@ export default function App() {
             onCursorMove={setCursorCoord}
             canvasRef={canvasRef}
           />
+
+          {/* Floating Mobile Action Bar (Erase, Rotate, Copy, Size, Nudge) */}
+          {selectedItem && (
+            <MobileActionBar
+              selectedItem={selectedItem}
+              unit={unit}
+              onRotate={handleRotate}
+              onDuplicate={handleDuplicateItem}
+              onDelete={handleDeleteItem}
+              onToggleLock={handleToggleLock}
+              onNudge={handleNudge}
+              onOpenProperties={() => setActiveDrawer('inspector')}
+              onDeselect={() => setSelectedId(null)}
+            />
+          )}
         </section>
 
-        {/* Right Inspector Panel: Dynamic Component & Room Inspector */}
+        {/* Desktop Right Inspector Panel (Hidden on screens < lg) */}
         <RightPropertiesPanel
           room={room}
           unit={unit}
@@ -331,15 +389,88 @@ export default function App() {
         />
       </main>
 
-      {/* 3. Bottom Status Bar */}
-      <StatusBar
-        room={room}
-        unit={unit}
-        cursorCoord={cursorCoord}
-        validation={validation}
-        selectedItem={selectedItem}
-        outsideCount={outsideIds.size}
-        overlapCount={overlappingIds.size}
+      {/* 3. Mobile Slide-Over Drawers (< lg screens) */}
+      {(activeDrawer === 'furniture' || activeDrawer === 'room') && (
+        <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={() => setActiveDrawer(null)}
+          />
+          <div className="relative z-10 w-full h-[82vh] max-h-[85vh] bg-slate-900 rounded-t-3xl border-t border-slate-700 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
+            <LeftSidebar
+              key={activeDrawer}
+              room={room}
+              unit={unit}
+              validation={validation}
+              onChangeRoom={setRoom}
+              onPresetSelect={(preset) => {
+                handlePresetSelect(preset);
+                setActiveDrawer(null);
+              }}
+              onAddFurnitureItem={(catalogItem) => {
+                handleAddFurnitureItem(catalogItem);
+                setActiveDrawer(null); // Close drawer so user sees item on canvas!
+              }}
+              placedItemsCount={items.length}
+              initialTab={activeDrawer === 'furniture' ? 'library' : 'room'}
+              isMobileDrawer={true}
+              onClose={() => setActiveDrawer(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {activeDrawer === 'inspector' && (
+        <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={() => setActiveDrawer(null)}
+          />
+          <div className="relative z-10 w-full h-[78vh] max-h-[85vh] bg-slate-900 rounded-t-3xl border-t border-slate-700 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
+            <RightPropertiesPanel
+              room={room}
+              unit={unit}
+              selectedItem={selectedItem}
+              isOverlapping={selectedId ? overlappingIds.has(selectedId) : false}
+              isOutside={selectedId ? outsideIds.has(selectedId) : false}
+              onChangeItem={handleChangeItem}
+              onDuplicateItem={handleDuplicateItem}
+              onDeleteItem={(id) => {
+                handleDeleteItem(id);
+                setActiveDrawer(null);
+              }}
+              onDeselect={() => {
+                setSelectedId(null);
+                setActiveDrawer(null);
+              }}
+              totalItemsCount={items.length}
+              isMobileDrawer={true}
+              onClose={() => setActiveDrawer(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Desktop Status Bar (Hidden on Mobile) */}
+      <div className="hidden sm:block">
+        <StatusBar
+          room={room}
+          unit={unit}
+          cursorCoord={cursorCoord}
+          validation={validation}
+          selectedItem={selectedItem}
+          outsideCount={outsideIds.size}
+          overlapCount={overlappingIds.size}
+        />
+      </div>
+
+      {/* 5. Mobile Bottom Navigation Bar (< lg screens) */}
+      <MobileNavBar
+        activeDrawer={activeDrawer}
+        onToggleDrawer={setActiveDrawer}
+        onFitToView={handleFitToView}
+        placedItemsCount={items.length}
+        hasSelection={!!selectedItem}
       />
     </div>
   );

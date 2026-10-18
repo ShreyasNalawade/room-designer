@@ -133,6 +133,69 @@ export default function RoomCanvas({
     });
   };
 
+  // Touch Pinch-to-Zoom & Multi-touch gestures
+  const lastDistRef = useRef(0);
+  const lastCenterRef = useRef(null);
+
+  const handleTouchMove = (e) => {
+    const touches = e.evt.touches;
+    if (touches && touches.length === 2) {
+      e.evt.preventDefault();
+      const touch1 = touches[0];
+      const touch2 = touches[1];
+
+      const dist = Math.hypot(
+        touch1.clientX - touch2.clientX,
+        touch1.clientY - touch2.clientY
+      );
+
+      const center = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2,
+      };
+
+      if (!lastDistRef.current) {
+        lastDistRef.current = dist;
+        lastCenterRef.current = center;
+        return;
+      }
+
+      const pointTo = {
+        x: (center.x - stagePos.x) / stageScale,
+        y: (center.y - stagePos.y) / stageScale,
+      };
+
+      const scaleBy = dist / lastDistRef.current;
+      const newScale = Math.min(Math.max(stageScale * scaleBy, MIN_SCALE), MAX_SCALE);
+
+      setStageScale(newScale);
+      setStagePos({
+        x: center.x - pointTo.x * newScale,
+        y: center.y - pointTo.y * newScale,
+      });
+
+      lastDistRef.current = dist;
+      lastCenterRef.current = center;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    lastDistRef.current = 0;
+    lastCenterRef.current = null;
+  };
+
+  // Expose methods to parent ref
+  useEffect(() => {
+    if (canvasRef) {
+      canvasRef.current = {
+        fitToView,
+        resetView,
+        zoomBy,
+        stage: stageRef.current,
+      };
+    }
+  }, [canvasRef, fitToView, resetView, zoomBy]);
+
   // Track cursor position for the status bar in real-world units
   const handlePointerMove = () => {
     const stage = stageRef.current;
@@ -208,23 +271,25 @@ export default function RoomCanvas({
       className="relative w-full h-full bg-[#030712] overflow-hidden flex items-center justify-center cursor-crosshair select-none"
     >
       {/* Floating Canvas Controls Overlay */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-1.5 shadow-xl text-slate-300">
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-1 sm:gap-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-1 sm:p-1.5 shadow-xl text-slate-300">
         <button
           type="button"
           onClick={() => zoomBy(1.2)}
-          title="Zoom In (Scroll Up)"
-          className="p-1.5 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer"
+          title="Zoom In"
+          aria-label="Zoom In"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer touch-manipulation"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
-        <span className="text-xs font-mono font-medium px-2 text-slate-400 select-none min-w-[50px] text-center">
+        <span className="text-[11px] sm:text-xs font-mono font-medium px-1 sm:px-2 text-slate-400 select-none min-w-[42px] sm:min-w-[50px] text-center">
           {Math.round(stageScale * 100)}%
         </span>
         <button
           type="button"
           onClick={() => zoomBy(0.8)}
-          title="Zoom Out (Scroll Down)"
-          className="p-1.5 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer"
+          title="Zoom Out"
+          aria-label="Zoom Out"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer touch-manipulation"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
@@ -233,7 +298,8 @@ export default function RoomCanvas({
           type="button"
           onClick={fitToView}
           title="Fit Room to Screen"
-          className="p-1.5 hover:bg-slate-800 hover:text-emerald-400 rounded transition flex items-center gap-1 text-xs cursor-pointer"
+          aria-label="Fit Room to Screen"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 hover:text-emerald-400 rounded transition flex items-center gap-1 text-xs cursor-pointer touch-manipulation"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
@@ -241,7 +307,8 @@ export default function RoomCanvas({
           type="button"
           onClick={resetView}
           title="Reset Zoom to 100%"
-          className="p-1.5 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer"
+          aria-label="Reset Zoom to 100%"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 hover:text-white rounded transition cursor-pointer touch-manipulation"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
@@ -250,7 +317,8 @@ export default function RoomCanvas({
           type="button"
           onClick={() => setShowGrid((v) => !v)}
           title={showGrid ? 'Hide Grid' : 'Show Grid'}
-          className={`p-1.5 rounded transition cursor-pointer ${
+          aria-label={showGrid ? 'Hide Grid' : 'Show Grid'}
+          className={`p-1.5 sm:p-2 rounded transition cursor-pointer touch-manipulation ${
             showGrid ? 'bg-slate-800 text-cyan-400' : 'hover:bg-slate-800 text-slate-500'
           }`}
         >
@@ -258,17 +326,16 @@ export default function RoomCanvas({
         </button>
       </div>
 
-      {/* Floating Canvas Pan Prompt */}
-      <div className="absolute top-4 left-4 z-20 pointer-events-none flex items-center gap-2 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-400 shadow-sm">
+      {/* Floating Canvas Pan Prompt (Desktop only to prevent mobile clutter) */}
+      <div className="hidden md:flex absolute top-4 left-4 z-20 pointer-events-none items-center gap-2 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-400 shadow-sm">
         <Move className="w-3.5 h-3.5 text-slate-500" />
-        <span>Click & drag background to pan • Wheel to zoom • Click items to edit</span>
+        <span>Drag background to pan • Wheel or Pinch to zoom • Tap items to edit</span>
       </div>
 
       {/* Konva Stage */}
       <Stage
         ref={(node) => {
           stageRef.current = node;
-          if (canvasRef) canvasRef.current = node;
         }}
         width={dimensions.width}
         height={dimensions.height}
@@ -283,6 +350,12 @@ export default function RoomCanvas({
             onSelect(null);
           }
         }}
+        onTap={(e) => {
+          // Deselect on mobile tap on empty stage
+          if (e.target === e.target.getStage() && onSelect) {
+            onSelect(null);
+          }
+        }}
         onDragEnd={(e) => {
           if (e.target === stageRef.current) {
             setStagePos({ x: e.target.x(), y: e.target.y() });
@@ -290,6 +363,9 @@ export default function RoomCanvas({
         }}
         onWheel={handleWheel}
         onMouseMove={handlePointerMove}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
         {/* Layer 1: Background Grid */}
         <Layer listening={false}>

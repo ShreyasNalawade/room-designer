@@ -28,6 +28,8 @@ export default function RightPropertiesPanel({
   onDeleteItem,
   onDeselect,
   totalItemsCount = 0,
+  isMobileDrawer = false,
+  onClose,
 }) {
   const currentUnit = UNITS[unit] || UNITS.m;
   const metrics = calculateRoomMetrics(room, unit);
@@ -60,7 +62,18 @@ export default function RightPropertiesPanel({
     };
 
     return (
-      <aside className="w-80 bg-slate-900/95 border-l border-slate-800 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto select-none">
+      <aside
+        className={`${
+          isMobileDrawer
+            ? 'w-full h-full'
+            : 'w-80 border-l border-slate-800 hidden lg:flex'
+        } bg-slate-900/95 flex flex-col h-full overflow-y-auto select-none`}
+      >
+        {isMobileDrawer && (
+          <div className="pt-2 pb-1 bg-slate-950/90 border-b border-slate-800 shrink-0">
+            <div className="w-12 h-1.5 rounded-full bg-slate-700 mx-auto mb-1.5" />
+          </div>
+        )}
         <div className="p-4 space-y-5">
           {/* Item Inspector Header */}
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -72,9 +85,9 @@ export default function RightPropertiesPanel({
             </div>
             <button
               type="button"
-              onClick={onDeselect}
+              onClick={isMobileDrawer ? onClose : onDeselect}
               className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition"
-              title="Deselect (Escape)"
+              title="Close (Escape)"
             >
               <X className="w-4 h-4" />
             </button>
@@ -304,7 +317,18 @@ export default function RightPropertiesPanel({
 
   // When no item is selected, render Room Properties
   return (
-    <aside className="w-80 bg-slate-900/95 border-l border-slate-800 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto select-none">
+    <aside
+      className={`${
+        isMobileDrawer
+          ? 'w-full h-full'
+          : 'w-80 border-l border-slate-800 hidden lg:flex'
+      } bg-slate-900/95 flex flex-col h-full overflow-y-auto select-none`}
+    >
+      {isMobileDrawer && (
+        <div className="pt-2 pb-1 bg-slate-950/90 border-b border-slate-800 shrink-0">
+          <div className="w-12 h-1.5 rounded-full bg-slate-700 mx-auto mb-1.5" />
+        </div>
+      )}
       <div className="p-4 space-y-6">
         {/* Panel Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -312,9 +336,20 @@ export default function RightPropertiesPanel({
             <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
             <h2 className="text-xs font-bold uppercase tracking-wider">Room Properties</h2>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 capitalize">
-            {room.shape}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 capitalize">
+              {room.shape}
+            </span>
+            {isMobileDrawer && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Real-world Area & Metrics Card */}

@@ -518,6 +518,10 @@ export default function FurnitureItem({
           e.cancelBubble = true;
           onSelect(item.id);
         }}
+        onTouchStart={(e) => {
+          e.cancelBubble = true;
+          onSelect(item.id);
+        }}
         onDragStart={(e) => {
           e.cancelBubble = true;
           onSelect(item.id);
@@ -561,8 +565,9 @@ export default function FurnitureItem({
             return newBox;
           }}
           rotateEnabled={true}
+          rotateAnchorOffset={typeof window !== 'undefined' && window.innerWidth < 768 ? 24 : 16}
           enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
-          anchorSize={7}
+          anchorSize={typeof window !== 'undefined' && window.innerWidth < 768 ? 13 : 8}
           anchorCornerRadius={2}
           anchorStroke="#38bdf8"
           anchorFill="#0f172a"

@@ -13,6 +13,7 @@ import {
   Sparkles,
   Armchair,
   Maximize2,
+  X,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
 import { fromMm, toMm, formatMeasurement } from '../../utils/units';
@@ -100,8 +101,20 @@ export default function LeftSidebar({
   onPresetSelect,
   onAddFurnitureItem,
   placedItemsCount = 0,
+  initialTab = 'library',
+  isMobileDrawer = false,
+  onClose,
 }) {
-  const [activeTab, setActiveTab] = useState('library'); // 'library' | 'room'
+  const [internalTab, setInternalTab] = useState(initialTab);
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
+
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
+    setInternalTab(initialTab);
+  }
+  const activeTab = internalTab;
+  const setActiveTab = setInternalTab;
+
   const currentUnit = UNITS[unit] || UNITS.m;
   const isSquareLocked = room.shape === 'square';
   const isTrapezoid = room.shape === 'trapezoid';
@@ -191,9 +204,34 @@ export default function LeftSidebar({
     : 0;
 
   return (
-    <aside className="w-80 bg-slate-900/95 border-r border-slate-800 flex flex-col h-[calc(100vh-3.5rem)] select-none">
+    <aside
+      className={`${
+        isMobileDrawer
+          ? 'w-full h-full'
+          : 'w-80 border-r border-slate-800 hidden lg:flex'
+      } bg-slate-900/95 flex flex-col h-full select-none overflow-hidden`}
+    >
+      {/* Drawer Header on Mobile */}
+      {isMobileDrawer && (
+        <div className="pt-2 pb-1 bg-slate-950/90 border-b border-slate-800 shrink-0">
+          <div className="w-12 h-1.5 rounded-full bg-slate-700 mx-auto mb-2.5" />
+          <div className="flex items-center justify-between px-4 pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              {activeTab === 'library' ? 'Add Furniture Components' : 'Room Shape & Dimensions'}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Sidebar Tab Navigation */}
-      <div className="grid grid-cols-2 p-2 bg-slate-950/80 border-b border-slate-800 gap-1">
+      <div className="grid grid-cols-2 p-2 bg-slate-950/80 border-b border-slate-800 gap-1 shrink-0">
         <button
           type="button"
           onClick={() => setActiveTab('library')}
