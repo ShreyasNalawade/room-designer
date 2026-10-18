@@ -7,7 +7,12 @@ import {
   isItemOutsideRoom,
   analyzeItemCollisions,
 } from '../collision';
-import { saveDesign, loadDesign, clearSavedDesign } from '../storage';
+import {
+  saveDesign,
+  loadDesign,
+  clearSavedDesign,
+  parseAndValidateDesignJSON,
+} from '../storage';
 
 describe('Furniture Catalog Definitions', () => {
   it('contains items for all required categories', () => {
@@ -196,5 +201,67 @@ describe('LocalStorage Persistence', () => {
     saveDesign({ widthMm: 5000 }, [], 'm');
     clearSavedDesign();
     expect(loadDesign()).toBeNull();
+  });
+});
+
+describe('Design File Import and Export Validation', () => {
+  it('validates and parses valid exported JSON design', () => {
+    const rawExport = JSON.stringify({
+      app: 'RoomCraft',
+      schemaVersion: 2,
+      room: {
+        id: 'r1',
+        name: 'Master Bed',
+        shape: 'rectangle',
+        widthMm: 4800,
+        lengthMm: 3600,
+      },
+      items: [
+        {
+          id: 'item-1',
+          name: 'Double Bed',
+          category: 'bedroom',
+          widthMm: 1400,
+          depthMm: 2000,
+          x: 100,
+          y: 200,
+          rotation: 90,
+          locked: false,
+        },
+      ],
+      unit: 'ft',
+    });
+
+    const parsed = parseAndValidateDesignJSON(rawExport);
+    expect(parsed.valid).toBe(true);
+    expect(parsed.data.room.widthMm).toBe(4800);
+    expect(parsed.data.items.length).toBe(1);
+    expect(parsed.data.items[0].rotation).toBe(90);
+    expect(parsed.data.unit).toBe('ft');
+  });
+
+  it('rejects malformed or non-JSON input with understandable errors', () => {
+    const invalid = parseAndValidateDesignJSON('{ invalid json syntax');
+    expect(invalid.valid).toBe(false);
+    expect(invalid.error).toContain('JSON Parse error');
+  });
+
+  it('rejects JSON missing room geometry specification', () => {
+    const missingRoom = parseAndValidateDesignJSON(JSON.stringify({ items: [] }));
+    expect(missingRoom.valid).toBe(false);
+    expect(missingRoom.error).toContain('missing room geometry');
+  });
+
+  it('normalizes missing properties with sensible architectural fallbacks', () => {
+    const minimal = parseAndValidateDesignJSON(
+      JSON.stringify({
+        room: { widthMm: 5000 },
+        items: [{ name: 'Desk' }],
+      })
+    );
+    expect(minimal.valid).toBe(true);
+    expect(minimal.data.room.lengthMm).toBe(4500); // fallback
+    expect(minimal.data.items[0].widthMm).toBe(800); // fallback
+    expect(minimal.data.items[0].rotation).toBe(0); // fallback
   });
 });

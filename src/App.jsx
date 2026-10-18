@@ -6,8 +6,15 @@ import StatusBar from './components/layout/StatusBar';
 import RoomCanvas from './components/canvas/RoomCanvas';
 import { validateRoomDimensions } from './utils/validation';
 import { analyzeItemCollisions } from './utils/collision';
-import { saveDesign, loadDesign, clearSavedDesign } from './utils/storage';
+import {
+  saveDesign,
+  loadDesign,
+  clearSavedDesign,
+  exportDesignFile,
+  importDesignFromFile,
+} from './utils/storage';
 import { DEFAULT_UNIT } from './constants/units';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const DEFAULT_STARTER_ROOM = {
   id: 'room-1',
@@ -44,7 +51,15 @@ export default function App() {
     return saved?.savedAt || null;
   });
 
+  const [toast, setToast] = useState(null);
   const canvasRef = useRef(null);
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Compute live validation of current room dimensions
   const validation = useMemo(
@@ -69,8 +84,40 @@ export default function App() {
     const res = saveDesign(room, items, unit);
     if (res.success) {
       setLastSavedAt(res.timestamp);
+      setToast({ message: 'Design successfully saved to browser storage!', type: 'success' });
     }
   }, [room, items, unit]);
+
+  // Export design to downloadable .json file
+  const handleExportDesign = useCallback(() => {
+    const res = exportDesignFile(room, items, unit);
+    if (res.success) {
+      setToast({
+        message: `Exported design as "${res.fileName}"! You can import this on any device.`,
+        type: 'success',
+      });
+    } else {
+      setToast({ message: `Export error: ${res.error}`, type: 'error' });
+    }
+  }, [room, items, unit]);
+
+  // Import design from uploaded .json file
+  const handleImportDesign = useCallback(async (file) => {
+    const res = await importDesignFromFile(file);
+    if (res.success) {
+      setRoom(res.data.room);
+      setItems(res.data.items);
+      setUnit(res.data.unit);
+      setSelectedId(null);
+      setLastSavedAt(res.data.savedAt);
+      setToast({
+        message: `Successfully loaded "${res.data.room.name}" with ${res.data.items.length} components!`,
+        type: 'success',
+      });
+    } else {
+      setToast({ message: `Import error: ${res.error}`, type: 'error' });
+    }
+  }, []);
 
   // Debounced autosave whenever edits happen
   useEffect(() => {
@@ -91,6 +138,7 @@ export default function App() {
       setItems([]);
       setSelectedId(null);
       setLastSavedAt(null);
+      setToast({ message: 'Started fresh room design.', type: 'success' });
     }
   };
 
@@ -111,7 +159,6 @@ export default function App() {
   // Add new furniture component from catalog into room
   const handleAddFurnitureItem = (catalogItem) => {
     const count = items.length;
-    // Offset slightly so new items don't stack directly on top of each other
     const offsetMm = (count % 5) * 150;
     const w = catalogItem.widthMm || 800;
     const d = catalogItem.depthMm || 600;
@@ -163,13 +210,11 @@ export default function App() {
   // Global keyboard shortcuts (Esc, Delete, Ctrl+D, Arrow nudge)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't intercept if user is typing into an input field or textarea
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') {
         return;
       }
 
-      // Escape to deselect
       if (e.key === 'Escape') {
         setSelectedId(null);
         return;
@@ -177,7 +222,6 @@ export default function App() {
 
       if (!selectedItem) return;
 
-      // Delete / Backspace to remove item
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (!selectedItem.locked) {
           e.preventDefault();
@@ -186,18 +230,16 @@ export default function App() {
         return;
       }
 
-      // Ctrl+D or Cmd+D to duplicate
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         handleDuplicateItem(selectedItem);
         return;
       }
 
-      // Arrow keys to nudge selected item position
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (selectedItem.locked) return;
         e.preventDefault();
-        const step = e.shiftKey ? 250 : 50; // 50mm or 250mm nudge
+        const step = e.shiftKey ? 250 : 50;
 
         let dx = 0;
         let dy = 0;
@@ -219,7 +261,19 @@ export default function App() {
   }, [selectedItem, handleDeleteItem, handleDuplicateItem]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans relative">
+      {/* Toast Notification Banner */}
+      {toast && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-top-2 duration-200 text-xs font-medium bg-slate-900/95 border-slate-700 text-slate-100">
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* 1. Top Navigation & Toolbar */}
       <HeaderToolbar
         room={room}
@@ -228,6 +282,8 @@ export default function App() {
         onPresetSelect={handlePresetSelect}
         onSaveDesign={handleSaveDesign}
         onResetDesign={handleResetDesign}
+        onExportDesign={handleExportDesign}
+        onImportDesign={handleImportDesign}
         lastSavedAt={lastSavedAt}
       />
 
