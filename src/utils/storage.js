@@ -111,6 +111,7 @@ export function parseAndValidateDesignJSON(rawString) {
       lengthMm: Number(data.room.lengthMm) || 4500,
       topWidthMm: Number(data.room.topWidthMm) || (shape === 'trapezoid' ? 4000 : undefined),
       bottomWidthMm: Number(data.room.bottomWidthMm) || (shape === 'trapezoid' ? 6000 : undefined),
+      rotation: typeof data.room.rotation === 'number' ? data.room.rotation : 0,
     };
 
     const items = Array.isArray(data.items)

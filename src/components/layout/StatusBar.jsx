@@ -1,5 +1,6 @@
-import { MousePointer, CheckCircle, AlertCircle, AlertTriangle, Armchair } from 'lucide-react';
+import { MousePointer, CheckCircle, AlertCircle, AlertTriangle, Armchair, Compass } from 'lucide-react';
 import { formatMeasurement } from '../../utils/units';
+import { getHeadingDirection } from '../../utils/orientation';
 
 export default function StatusBar({
   room,
@@ -10,6 +11,8 @@ export default function StatusBar({
   outsideCount = 0,
   overlapCount = 0,
 }) {
+  const heading = getHeadingDirection(room.rotation || 0);
+
   return (
     <footer className="h-8 bg-slate-950 border-t border-slate-800 px-4 flex items-center justify-between text-xs text-slate-400 select-none z-30">
       {/* Left: Cursor World Coordinates & Room Summary */}
@@ -31,6 +34,14 @@ export default function StatusBar({
             {room.shape === 'trapezoid'
               ? `Trapezoid ${formatMeasurement(room.topWidthMm || 4000, unit)} / ${formatMeasurement(room.bottomWidthMm || 6000, unit)} × ${formatMeasurement(room.lengthMm, unit)}`
               : `${formatMeasurement(room.widthMm, unit)} × ${formatMeasurement(room.lengthMm, unit)}`}
+          </span>
+        </div>
+
+        <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-400 border-l border-slate-800 pl-3 font-mono">
+          <Compass className="w-3 h-3 text-rose-400" />
+          <span>Heading:</span>
+          <span className="text-slate-200 font-semibold">
+            {room.rotation || 0}° {heading.code}
           </span>
         </div>
 

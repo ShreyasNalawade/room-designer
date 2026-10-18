@@ -16,6 +16,7 @@ import {
   importDesignFromFile,
 } from './utils/storage';
 import { DEFAULT_UNIT } from './constants/units';
+import { rotateRoom, setRoomRotation } from './utils/orientation';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 const DEFAULT_STARTER_ROOM = {
@@ -27,6 +28,7 @@ const DEFAULT_STARTER_ROOM = {
   lengthMm: 4500,
   topWidthMm: 4000,
   bottomWidthMm: 6000,
+  rotation: 0,
 };
 
 export default function App() {
@@ -156,8 +158,19 @@ export default function App() {
       lengthMm: preset.lengthMm,
       topWidthMm: preset.topWidthMm || Math.round(preset.widthMm * 0.75),
       bottomWidthMm: preset.bottomWidthMm || preset.widthMm,
+      rotation: 0,
     });
   };
+
+  // Rotate entire room and all its components
+  const handleRotateRoom = useCallback((deltaDeg = 90) => {
+    setRoom((prev) => rotateRoom(prev, deltaDeg));
+  }, []);
+
+  // Set entire room rotation to exact degree
+  const handleSetRoomRotation = useCallback((targetDeg = 0) => {
+    setRoom((prev) => setRoomRotation(prev, targetDeg));
+  }, []);
 
   // Add new furniture component from catalog into room
   const handleAddFurnitureItem = (catalogItem) => {
@@ -355,6 +368,8 @@ export default function App() {
             onSelect={setSelectedId}
             onChangeItem={handleChangeItem}
             onCursorMove={setCursorCoord}
+            onRotateRoom={handleRotateRoom}
+            onSetRotation={handleSetRoomRotation}
             canvasRef={canvasRef}
           />
 
@@ -388,6 +403,8 @@ export default function App() {
           onDuplicateItem={handleDuplicateItem}
           onDeleteItem={handleDeleteItem}
           onDeselect={() => setSelectedId(null)}
+          onRotateRoom={handleRotateRoom}
+          onSetRotation={handleSetRoomRotation}
           totalItemsCount={items.length}
         />
       </main>
@@ -448,6 +465,8 @@ export default function App() {
                 setActiveDrawer(null);
               }}
               totalItemsCount={items.length}
+              onRotateRoom={handleRotateRoom}
+              onSetRotation={handleSetRoomRotation}
               isMobileDrawer={true}
               onClose={() => setActiveDrawer(null)}
             />

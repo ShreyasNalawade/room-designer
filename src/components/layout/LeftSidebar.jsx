@@ -14,10 +14,14 @@ import {
   Armchair,
   Maximize2,
   X,
+  Compass,
+  RotateCw,
+  RotateCcw,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
 import { fromMm, toMm, formatMeasurement } from '../../utils/units';
 import { ROOM_PRESETS } from '../../constants/presets';
+import { getHeadingDirection, rotateRoom, setRoomRotation } from '../../utils/orientation';
 import FurnitureCatalog from './FurnitureCatalog';
 
 function DimensionControl({
@@ -418,6 +422,108 @@ export default function LeftSidebar({
                 />
               </>
             )}
+          </div>
+
+          {/* Room Orientation & Compass Direction */}
+          <div className="space-y-3 bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <Compass className="w-4 h-4 text-rose-400" />
+                <span>Orientation & Compass</span>
+              </div>
+              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-rose-300">
+                {room.rotation || 0}° {getHeadingDirection(room.rotation || 0).code}
+              </span>
+            </div>
+
+            <div className="text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Facing Cardinal Direction:</span>
+              <strong className="text-cyan-400 font-semibold">
+                {getHeadingDirection(room.rotation || 0).label}
+              </strong>
+            </div>
+
+            {/* Quick Cardinal Snap Buttons */}
+            <div className="grid grid-cols-4 gap-1.5 pt-1">
+              {[
+                { code: 'N', deg: 0, label: 'North', color: 'rose' },
+                { code: 'E', deg: 90, label: 'East', color: 'cyan' },
+                { code: 'S', deg: 180, label: 'South', color: 'cyan' },
+                { code: 'W', deg: 270, label: 'West', color: 'cyan' },
+              ].map(({ code, deg, label }) => {
+                const isSelected = (room.rotation || 0) === deg;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => onChangeRoom(setRoomRotation(room, deg))}
+                    title={`Align Room Facing ${label} (${deg}°)`}
+                    className={`py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center ${
+                      isSelected
+                        ? code === 'N'
+                          ? 'bg-rose-950/60 border-rose-500 text-rose-300 shadow-sm shadow-rose-950'
+                          : 'bg-cyan-950/60 border-cyan-500 text-cyan-300 shadow-sm shadow-cyan-950'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    }`}
+                  >
+                    <span>{code}</span>
+                    <span className="text-[9px] font-normal opacity-70">{deg}°</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 90-Degree Full Room Rotation Buttons */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => onChangeRoom(rotateRoom(room, -90))}
+                title="Rotate Room 90° Counter-Clockwise"
+                className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>-90°</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onChangeRoom(rotateRoom(room, 90))}
+                title="Rotate Room 90° Clockwise"
+                className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+              >
+                <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
+                <span>+90°</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onChangeRoom(rotateRoom(room, 180))}
+                title="Rotate Room 180° Flip"
+                className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+              >
+                <span>180°</span>
+              </button>
+            </div>
+
+            {/* Custom Angle Slider */}
+            <div className="space-y-1 pt-1.5 border-t border-slate-800/80">
+              <div className="flex justify-between text-[11px] text-slate-400">
+                <span>Custom Rotation Angle:</span>
+                <span className="font-mono text-cyan-400 font-semibold">{room.rotation || 0}°</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="355"
+                step="5"
+                value={room.rotation || 0}
+                onChange={(e) => onChangeRoom(setRoomRotation(room, Number(e.target.value)))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              />
+              <span className="text-[10px] text-slate-500 block text-center">
+                Rotates the full room layout with all components simultaneously
+              </span>
+            </div>
           </div>
 
           {/* Validation Alerts */}

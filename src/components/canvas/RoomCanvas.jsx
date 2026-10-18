@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Text, Group, Circle } from 'react-konva';
-import { Maximize2, RotateCcw, ZoomIn, ZoomOut, Grid as GridIcon, Move, Ruler } from 'lucide-react';
+import { Maximize2, RotateCcw, RotateCw, ZoomIn, ZoomOut, Grid as GridIcon, Move, Ruler } from 'lucide-react';
 import FurnitureItem from './FurnitureItem';
+import CompassRose from './CompassRose';
 import { formatMeasurement, calculateRoomMetrics } from '../../utils/units';
 import { calculateWallClearances } from '../../utils/measurements';
 
@@ -21,6 +22,8 @@ export default function RoomCanvas({
   onSelect,
   onChangeItem,
   onCursorMove,
+  onRotateRoom,
+  onSetRotation,
   canvasRef,
 }) {
   const containerRef = useRef(null);
@@ -62,6 +65,10 @@ export default function RoomCanvas({
   const halfTopW = topWPx / 2;
   const halfBottomW = bottomWPx / 2;
   const halfL = lengthPx / 2;
+  const roomRot = (((room.rotation || 0) % 360) + 360) % 360;
+  const isRotatedQuarter = roomRot === 90 || roomRot === 270;
+  const effectiveVisualW = isRotatedQuarter ? lengthPx : maxWPx;
+  const effectiveVisualH = isRotatedQuarter ? maxWPx : lengthPx;
 
   // Fit room into view
   const fitToView = useCallback(() => {
@@ -71,8 +78,8 @@ export default function RoomCanvas({
     const availW = Math.max(dimensions.width - padding * 2, 200);
     const availH = Math.max(dimensions.height - padding * 2, 200);
 
-    const scaleX = availW / maxWPx;
-    const scaleY = availH / lengthPx;
+    const scaleX = availW / effectiveVisualW;
+    const scaleY = availH / effectiveVisualH;
     const newScale = Math.min(Math.max(Math.min(scaleX, scaleY), MIN_SCALE), 2.2);
 
     setStageScale(newScale);
@@ -80,7 +87,7 @@ export default function RoomCanvas({
       x: dimensions.width / 2,
       y: dimensions.height / 2,
     });
-  }, [dimensions, maxWPx, lengthPx]);
+  }, [dimensions, maxWPx, effectiveVisualW, effectiveVisualH]);
 
   // Initial fit on mount or major preset change
   const roomId = room.id;
@@ -208,8 +215,13 @@ export default function RoomCanvas({
     const worldPxX = (pointer.x - stagePos.x) / stageScale;
     const worldPxY = (pointer.y - stagePos.y) / stageScale;
 
-    const worldMmX = worldPxX / BASE_PX_PER_MM;
-    const worldMmY = worldPxY / BASE_PX_PER_MM;
+    // Apply inverse room rotation so cursor X/Y coordinates map to room's local axes
+    const rotRad = -((room.rotation || 0) * Math.PI) / 180;
+    const localPxX = worldPxX * Math.cos(rotRad) - worldPxY * Math.sin(rotRad);
+    const localPxY = worldPxX * Math.sin(rotRad) + worldPxY * Math.cos(rotRad);
+
+    const worldMmX = localPxX / BASE_PX_PER_MM;
+    const worldMmY = localPxY / BASE_PX_PER_MM;
 
     if (onCursorMove) {
       onCursorMove({ xMm: worldMmX, yMm: worldMmY });
@@ -281,6 +293,13 @@ export default function RoomCanvas({
       ref={containerRef}
       className="relative w-full h-full bg-[#030712] overflow-hidden flex items-center justify-center cursor-crosshair select-none"
     >
+      {/* Interactive Compass Rose HUD (Top-Left) */}
+      <CompassRose
+        rotation={room.rotation || 0}
+        onRotateRoom={onRotateRoom}
+        onSetRotation={onSetRotation}
+      />
+
       {/* Floating Canvas Controls Overlay */}
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-1 sm:gap-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-1 sm:p-1.5 shadow-xl text-slate-300">
         <button
@@ -326,6 +345,19 @@ export default function RoomCanvas({
         <div className="w-px h-4 bg-slate-800 my-auto mx-0.5" />
         <button
           type="button"
+          onClick={() => onRotateRoom?.(90)}
+          title="Rotate Room 90° Clockwise with All Components"
+          aria-label="Rotate Room 90° Clockwise"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 hover:text-cyan-400 rounded transition flex items-center gap-1 text-xs cursor-pointer touch-manipulation"
+        >
+          <RotateCw className="w-4 h-4 text-cyan-400" />
+          <span className="text-[10px] font-mono font-bold hidden sm:inline text-slate-300">
+            {room.rotation || 0}°
+          </span>
+        </button>
+        <div className="w-px h-4 bg-slate-800 my-auto mx-0.5" />
+        <button
+          type="button"
           onClick={() => setShowGrid((v) => !v)}
           title={showGrid ? 'Hide Grid' : 'Show Grid'}
           aria-label={showGrid ? 'Hide Grid' : 'Show Grid'}
@@ -349,7 +381,7 @@ export default function RoomCanvas({
       </div>
 
       {/* Floating Canvas Pan Prompt (Desktop only to prevent mobile clutter) */}
-      <div className="hidden md:flex absolute top-4 left-4 z-20 pointer-events-none items-center gap-2 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-400 shadow-sm">
+      <div className="hidden md:flex absolute bottom-4 left-4 z-20 pointer-events-none items-center gap-2 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-400 shadow-sm">
         <Move className="w-3.5 h-3.5 text-slate-500" />
         <span>Drag background to pan • Wheel or Pinch to zoom • Tap items to edit</span>
       </div>
@@ -405,9 +437,9 @@ export default function RoomCanvas({
           <Line points={[0, -20, 0, 20]} stroke="rgba(244, 63, 94, 0.5)" strokeWidth={1.5 / stageScale} />
         </Layer>
 
-        {/* Layer 2: Room Walls & Floor */}
+        {/* Layer 2: Room Walls, Floor & Orientation Badges */}
         <Layer>
-          <Group>
+          <Group rotation={room.rotation || 0} x={0} y={0}>
             {isTrapezoid ? (
               <>
                 {/* Outer Wall Boundary Polygon */}
@@ -609,28 +641,132 @@ export default function RoomCanvas({
                 />
               </Group>
             </Group>
+
+            {/* Direction Wall Badges: Rotating with full room */}
+            {/* North Wall Badge */}
+            <Group y={-halfL - t - 14}>
+              <Rect
+                x={-46}
+                y={-9}
+                width={92}
+                height={18}
+                fill="#4c0519"
+                stroke="#f43f5e"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="▲ NORTH WALL"
+                x={-46}
+                y={-5}
+                width={92}
+                align="center"
+                fontSize={9}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontStyle="700"
+                fill="#fecdd3"
+              />
+            </Group>
+
+            {/* South Wall Badge */}
+            <Group y={halfL + t + (isTrapezoid ? 46 : 14)}>
+              <Rect
+                x={-46}
+                y={-9}
+                width={92}
+                height={18}
+                fill="#0f172a"
+                stroke="#64748b"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="▼ SOUTH WALL"
+                x={-46}
+                y={-5}
+                width={92}
+                align="center"
+                fontSize={9}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontStyle="600"
+                fill="#94a3b8"
+              />
+            </Group>
+
+            {/* East Wall Badge */}
+            <Group x={maxWPx / 2 + t + 16} rotation={90}>
+              <Rect
+                x={-42}
+                y={-9}
+                width={84}
+                height={18}
+                fill="#0f172a"
+                stroke="#38bdf8"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="EAST WALL ▶"
+                x={-42}
+                y={-5}
+                width={84}
+                align="center"
+                fontSize={9}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontStyle="600"
+                fill="#7dd3fc"
+              />
+            </Group>
+
+            {/* West Wall Badge */}
+            <Group x={-maxWPx / 2 - t - 56} rotation={-90}>
+              <Rect
+                x={-42}
+                y={-9}
+                width={84}
+                height={18}
+                fill="#0f172a"
+                stroke="#38bdf8"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="◀ WEST WALL"
+                x={-42}
+                y={-5}
+                width={84}
+                align="center"
+                fontSize={9}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontStyle="600"
+                fill="#7dd3fc"
+              />
+            </Group>
           </Group>
         </Layer>
 
-        {/* Layer 3: Placed Furniture Objects */}
+        {/* Layer 3: Placed Furniture Objects (Rotates in lockstep with room) */}
         <Layer>
-          {items.map((item) => (
-            <FurnitureItem
-              key={item.id}
-              item={item}
-              pxPerMm={BASE_PX_PER_MM}
-              isSelected={selectedId === item.id}
-              isOverlapping={overlappingIds.has(item.id)}
-              isOutside={outsideIds.has(item.id)}
-              onSelect={onSelect}
-              onChange={onChangeItem}
-            />
-          ))}
+          <Group rotation={room.rotation || 0} x={0} y={0}>
+            {items.map((item) => (
+              <FurnitureItem
+                key={item.id}
+                item={item}
+                pxPerMm={BASE_PX_PER_MM}
+                isSelected={selectedId === item.id}
+                isOverlapping={overlappingIds.has(item.id)}
+                isOutside={outsideIds.has(item.id)}
+                onSelect={onSelect}
+                onChange={onChangeItem}
+              />
+            ))}
+          </Group>
         </Layer>
 
         {/* Layer 4: CAD Wall Clearance Dimension Guidelines for Selected Item */}
         {showGuidelines && selectedItem && wallClearances && (
           <Layer listening={false}>
+            <Group rotation={room.rotation || 0} x={0} y={0}>
             {/* North Wall Dimension Line */}
             {wallClearances.boundingBox.minY * BASE_PX_PER_MM > -halfL && (
               <Group>
@@ -896,6 +1032,7 @@ export default function RoomCanvas({
                 </Group>
               );
             })()}
+            </Group>
           </Layer>
         )}
       </Stage>

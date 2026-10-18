@@ -18,6 +18,7 @@ import {
 import { UNITS } from '../../constants/units';
 import { formatMeasurement, calculateRoomMetrics, fromMm, toMm } from '../../utils/units';
 import { calculateWallClearances, calculateSpaceUtilization } from '../../utils/measurements';
+import { getHeadingDirection } from '../../utils/orientation';
 
 export default function RightPropertiesPanel({
   room,
@@ -30,6 +31,8 @@ export default function RightPropertiesPanel({
   onDuplicateItem,
   onDeleteItem,
   onDeselect,
+  onRotateRoom,
+  onSetRotation,
   totalItemsCount = 0,
   isMobileDrawer = false,
   onClose,
@@ -705,6 +708,90 @@ export default function RightPropertiesPanel({
                 {spaceUtil.itemsCount} components
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Room Orientation & Compass Direction */}
+        <div className="space-y-3 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-4 h-4 text-rose-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                Orientation & Compass
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-950/80 border border-rose-800/60 px-2 py-0.5 rounded-full">
+              {room.rotation || 0}° {getHeadingDirection(room.rotation || 0).code}
+            </span>
+          </div>
+
+          <div className="text-[11px] text-slate-400 flex justify-between items-center">
+            <span>Room Orientation:</span>
+            <span className="font-semibold text-cyan-400">
+              Facing {getHeadingDirection(room.rotation || 0).label}
+            </span>
+          </div>
+
+          {/* Quick Snap Buttons */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { code: 'N', deg: 0, label: 'North' },
+              { code: 'E', deg: 90, label: 'East' },
+              { code: 'S', deg: 180, label: 'South' },
+              { code: 'W', deg: 270, label: 'West' },
+            ].map(({ code, deg, label }) => {
+              const isSelected = (room.rotation || 0) === deg;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => onSetRotation?.(deg)}
+                  title={`Align Room Facing ${label} (${deg}°)`}
+                  className={`py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center ${
+                    isSelected
+                      ? code === 'N'
+                        ? 'bg-rose-950/60 border-rose-500 text-rose-300'
+                        : 'bg-cyan-950/60 border-cyan-500 text-cyan-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{code}</span>
+                  <span className="text-[9px] font-normal opacity-70">{deg}°</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Rotate Buttons */}
+          <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800/80">
+            <button
+              type="button"
+              onClick={() => onRotateRoom?.(-90)}
+              title="Rotate Entire Room 90° Counter-Clockwise"
+              className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+              <span>-90°</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onRotateRoom?.(90)}
+              title="Rotate Entire Room 90° Clockwise"
+              className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+            >
+              <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
+              <span>+90°</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSetRotation?.(0)}
+              title="Reset Room to True North (0°)"
+              className="flex items-center justify-center py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-rose-400 transition cursor-pointer active:scale-95 font-mono"
+            >
+              Reset 0°
+            </button>
           </div>
         </div>
 
