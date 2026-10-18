@@ -1,17 +1,24 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Text, Group, Circle } from 'react-konva';
 import { Maximize2, RotateCcw, ZoomIn, ZoomOut, Grid as GridIcon, Move } from 'lucide-react';
-import { formatMeasurement, calculateArea } from '../../utils/units';
+import FurnitureItem from './FurnitureItem';
+import { formatMeasurement, calculateRoomMetrics } from '../../utils/units';
 
 // Base conversion: 0.1 screen pixels per canonical millimeter (100px per meter)
 const BASE_PX_PER_MM = 0.1;
-const WALL_THICKNESS_MM = 160; // standard 16cm architectural wall
+const WALL_THICKNESS_MM = 160; // 16cm solid wall core
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 4.0;
 
 export default function RoomCanvas({
   room,
   unit,
+  items = [],
+  selectedId,
+  outsideIds = new Set(),
+  overlappingIds = new Set(),
+  onSelect,
+  onChangeItem,
   onCursorMove,
   canvasRef,
 }) {
@@ -41,33 +48,39 @@ export default function RoomCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // Compute room dimensions in base canvas pixels
-  const roomWidthPx = room.widthMm * BASE_PX_PER_MM;
-  const roomLengthPx = room.lengthMm * BASE_PX_PER_MM;
-  const wallThicknessPx = Math.max(WALL_THICKNESS_MM * BASE_PX_PER_MM, 6);
+  const isTrapezoid = room.shape === 'trapezoid';
+
+  // Room geometry in pixels
+  const topWPx = (isTrapezoid ? room.topWidthMm || 4000 : room.widthMm) * BASE_PX_PER_MM;
+  const bottomWPx = (isTrapezoid ? room.bottomWidthMm || 6000 : room.widthMm) * BASE_PX_PER_MM;
+  const maxWPx = Math.max(topWPx, bottomWPx);
+  const lengthPx = room.lengthMm * BASE_PX_PER_MM;
+  const t = Math.max(WALL_THICKNESS_MM * BASE_PX_PER_MM, 6);
+
+  const halfTopW = topWPx / 2;
+  const halfBottomW = bottomWPx / 2;
+  const halfL = lengthPx / 2;
 
   // Fit room into view
   const fitToView = useCallback(() => {
-    if (dimensions.width === 0 || dimensions.height === 0 || roomWidthPx === 0) return;
+    if (dimensions.width === 0 || dimensions.height === 0 || maxWPx === 0) return;
 
-    // Available viewport margins
-    const padding = 120;
+    const padding = 130;
     const availW = Math.max(dimensions.width - padding * 2, 200);
     const availH = Math.max(dimensions.height - padding * 2, 200);
 
-    const scaleX = availW / roomWidthPx;
-    const scaleY = availH / roomLengthPx;
+    const scaleX = availW / maxWPx;
+    const scaleY = availH / lengthPx;
     const newScale = Math.min(Math.max(Math.min(scaleX, scaleY), MIN_SCALE), 2.2);
 
-    // Center the room at (0,0) relative to room center
-    const newX = dimensions.width / 2;
-    const newY = dimensions.height / 2;
-
     setStageScale(newScale);
-    setStagePos({ x: newX, y: newY });
-  }, [dimensions, roomWidthPx, roomLengthPx]);
+    setStagePos({
+      x: dimensions.width / 2,
+      y: dimensions.height / 2,
+    });
+  }, [dimensions, maxWPx, lengthPx]);
 
-  // Initial fit on mount or preset switch
+  // Initial fit on mount or major preset change
   const roomId = room.id;
   const hasValidDims = dimensions.width > 0 && dimensions.height > 0;
   useEffect(() => {
@@ -127,9 +140,8 @@ export default function RoomCanvas({
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    // Convert screen coordinates to world millimeters relative to room top-left
-    const worldPxX = (pointer.x - stagePos.x) / stageScale + roomWidthPx / 2;
-    const worldPxY = (pointer.y - stagePos.y) / stageScale + roomLengthPx / 2;
+    const worldPxX = (pointer.x - stagePos.x) / stageScale;
+    const worldPxY = (pointer.y - stagePos.y) / stageScale;
 
     const worldMmX = worldPxX / BASE_PX_PER_MM;
     const worldMmY = worldPxY / BASE_PX_PER_MM;
@@ -143,12 +155,9 @@ export default function RoomCanvas({
   const gridLines = useMemo(() => {
     if (!showGrid || dimensions.width === 0) return [];
     const lines = [];
-
-    // Grid step in canonical mm: 500mm minor grid, 1000mm major grid
     const stepMm = 1000;
     const stepPx = stepMm * BASE_PX_PER_MM;
-
-    const totalGridExtent = 20000 * BASE_PX_PER_MM; // 20m extent around room
+    const totalGridExtent = 20000 * BASE_PX_PER_MM;
 
     for (let x = -totalGridExtent; x <= totalGridExtent; x += stepPx) {
       const isMajor = Math.round(x / stepPx) % 5 === 0;
@@ -171,15 +180,27 @@ export default function RoomCanvas({
     return lines;
   }, [showGrid, dimensions.width]);
 
-  // Derived calculations
-  const roomArea = useMemo(
-    () => calculateArea(room.widthMm, room.lengthMm),
-    [room.widthMm, room.lengthMm]
-  );
+  // Derived room calculations
+  const roomMetrics = useMemo(() => calculateRoomMetrics(room, unit), [room, unit]);
 
-  const halfW = roomWidthPx / 2;
-  const halfL = roomLengthPx / 2;
-  const t = wallThicknessPx;
+  // Trapezoid wall polygon points (inner and outer)
+  const trapezoidInnerPoints = useMemo(() => {
+    return [
+      -halfTopW, -halfL,
+      halfTopW, -halfL,
+      halfBottomW, halfL,
+      -halfBottomW, halfL,
+    ];
+  }, [halfTopW, halfBottomW, halfL]);
+
+  const trapezoidOuterPoints = useMemo(() => {
+    return [
+      -halfTopW - t, -halfL - t,
+      halfTopW + t, -halfL - t,
+      halfBottomW + t * 1.2, halfL + t,
+      -halfBottomW - t * 1.2, halfL + t,
+    ];
+  }, [halfTopW, halfBottomW, halfL, t]);
 
   return (
     <div
@@ -240,7 +261,7 @@ export default function RoomCanvas({
       {/* Floating Canvas Pan Prompt */}
       <div className="absolute top-4 left-4 z-20 pointer-events-none flex items-center gap-2 bg-slate-900/80 backdrop-blur-sm border border-slate-800/80 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-400 shadow-sm">
         <Move className="w-3.5 h-3.5 text-slate-500" />
-        <span>Click & drag background to pan • Wheel to zoom</span>
+        <span>Click & drag background to pan • Wheel to zoom • Click items to edit</span>
       </div>
 
       {/* Konva Stage */}
@@ -256,13 +277,21 @@ export default function RoomCanvas({
         scaleX={stageScale}
         scaleY={stageScale}
         draggable
+        onClick={(e) => {
+          // Deselect if clicked on empty stage
+          if (e.target === e.target.getStage() && onSelect) {
+            onSelect(null);
+          }
+        }}
         onDragEnd={(e) => {
-          setStagePos({ x: e.target.x(), y: e.target.y() });
+          if (e.target === stageRef.current) {
+            setStagePos({ x: e.target.x(), y: e.target.y() });
+          }
         }}
         onWheel={handleWheel}
         onMouseMove={handlePointerMove}
       >
-        {/* Background Grid Layer */}
+        {/* Layer 1: Background Grid */}
         <Layer listening={false}>
           {gridLines.map((line, idx) => (
             <Line
@@ -274,76 +303,107 @@ export default function RoomCanvas({
           ))}
 
           {/* World Origin Crosshair */}
-          <Line
-            points={[-20, 0, 20, 0]}
-            stroke="rgba(244, 63, 94, 0.5)"
-            strokeWidth={1.5 / stageScale}
-          />
-          <Line
-            points={[0, -20, 0, 20]}
-            stroke="rgba(244, 63, 94, 0.5)"
-            strokeWidth={1.5 / stageScale}
-          />
+          <Line points={[-20, 0, 20, 0]} stroke="rgba(244, 63, 94, 0.5)" strokeWidth={1.5 / stageScale} />
+          <Line points={[0, -20, 0, 20]} stroke="rgba(244, 63, 94, 0.5)" strokeWidth={1.5 / stageScale} />
         </Layer>
 
-        {/* Room Layer */}
+        {/* Layer 2: Room Walls & Floor */}
         <Layer>
           <Group>
-            {/* Outer Wall Boundary (Thick Solid Wall Core) */}
-            <Rect
-              x={-halfW - t}
-              y={-halfL - t}
-              width={roomWidthPx + 2 * t}
-              height={roomLengthPx + 2 * t}
-              fill="#1e293b" // slate-800 solid masonry core
-              stroke="#475569" // slate-600 outer perimeter line
-              strokeWidth={2}
-              cornerRadius={2}
-              shadowColor="#000000"
-              shadowBlur={20}
-              shadowOpacity={0.4}
-              shadowOffset={{ x: 0, y: 10 }}
-            />
-
-            {/* Inner Room Floor Cavity */}
-            <Rect
-              x={-halfW}
-              y={-halfL}
-              width={roomWidthPx}
-              height={roomLengthPx}
-              fill="#0f172a" // slate-900 interior floor
-              stroke="#38bdf8" // cyan-400 inner room edge highlight
-              strokeWidth={1.5}
-            />
-
-            {/* Subtle Interior Floor Hatching / Pattern Grid */}
-            <Rect
-              x={-halfW}
-              y={-halfL}
-              width={roomWidthPx}
-              height={roomLengthPx}
-              stroke="rgba(56, 189, 248, 0.08)"
-              dash={[10, 10]}
-              strokeWidth={1}
-            />
-
-            {/* Corner Markers */}
-            {[
-              [-halfW, -halfL],
-              [halfW, -halfL],
-              [halfW, halfL],
-              [-halfW, halfL],
-            ].map(([cx, cy], idx) => (
-              <Circle
-                key={idx}
-                x={cx}
-                y={cy}
-                radius={3.5}
-                fill="#38bdf8"
-                stroke="#0f172a"
-                strokeWidth={1.5}
-              />
-            ))}
+            {isTrapezoid ? (
+              <>
+                {/* Outer Wall Boundary Polygon */}
+                <Line
+                  points={trapezoidOuterPoints}
+                  closed={true}
+                  fill="#1e293b"
+                  stroke="#475569"
+                  strokeWidth={2}
+                  shadowColor="#000000"
+                  shadowBlur={20}
+                  shadowOpacity={0.4}
+                />
+                {/* Inner Room Floor Cavity */}
+                <Line
+                  points={trapezoidInnerPoints}
+                  closed={true}
+                  fill="#0f172a"
+                  stroke="#38bdf8"
+                  strokeWidth={1.5}
+                />
+                {/* Corner Markers */}
+                {[
+                  [-halfTopW, -halfL],
+                  [halfTopW, -halfL],
+                  [halfBottomW, halfL],
+                  [-halfBottomW, halfL],
+                ].map(([cx, cy], idx) => (
+                  <Circle
+                    key={idx}
+                    x={cx}
+                    y={cy}
+                    radius={3.5}
+                    fill="#38bdf8"
+                    stroke="#0f172a"
+                    strokeWidth={1.5}
+                  />
+                ))}
+              </>
+            ) : (
+              <>
+                {/* Outer Wall Boundary Rectangle */}
+                <Rect
+                  x={-halfTopW - t}
+                  y={-halfL - t}
+                  width={topWPx + 2 * t}
+                  height={lengthPx + 2 * t}
+                  fill="#1e293b"
+                  stroke="#475569"
+                  strokeWidth={2}
+                  cornerRadius={2}
+                  shadowColor="#000000"
+                  shadowBlur={20}
+                  shadowOpacity={0.4}
+                />
+                {/* Inner Room Floor Cavity */}
+                <Rect
+                  x={-halfTopW}
+                  y={-halfL}
+                  width={topWPx}
+                  height={lengthPx}
+                  fill="#0f172a"
+                  stroke="#38bdf8"
+                  strokeWidth={1.5}
+                />
+                {/* Interior Grid Pattern */}
+                <Rect
+                  x={-halfTopW}
+                  y={-halfL}
+                  width={topWPx}
+                  height={lengthPx}
+                  stroke="rgba(56, 189, 248, 0.08)"
+                  dash={[10, 10]}
+                  strokeWidth={1}
+                />
+                {/* Corner Markers */}
+                {[
+                  [-halfTopW, -halfL],
+                  [halfTopW, -halfL],
+                  [halfTopW, halfL],
+                  [-halfTopW, halfL],
+                ].map(([cx, cy], idx) => (
+                  <Circle
+                    key={idx}
+                    x={cx}
+                    y={cy}
+                    radius={3.5}
+                    fill="#38bdf8"
+                    stroke="#0f172a"
+                    strokeWidth={1.5}
+                  />
+                ))}
+              </>
+            )}
 
             {/* Center Room Label & Area Badge */}
             <Group x={0} y={0}>
@@ -354,87 +414,47 @@ export default function RoomCanvas({
                 fontFamily="Inter, system-ui, sans-serif"
                 fill="#f8fafc"
                 align="center"
-                verticalAlign="middle"
                 offsetX={80}
-                offsetY={20}
+                offsetY={22}
                 width={160}
               />
               <Text
-                text={`${formatMeasurement(room.widthMm, unit)} × ${formatMeasurement(
-                  room.lengthMm,
-                  unit
-                )}`}
-                fontSize={12}
+                text={
+                  isTrapezoid
+                    ? `Top: ${formatMeasurement(room.topWidthMm || 4000, unit)} | Btm: ${formatMeasurement(room.bottomWidthMm || 6000, unit)}`
+                    : `${formatMeasurement(room.widthMm, unit)} × ${formatMeasurement(room.lengthMm, unit)}`
+                }
+                fontSize={11}
                 fontFamily="JetBrains Mono, monospace"
                 fill="#94a3b8"
                 align="center"
                 offsetX={80}
-                offsetY={0}
+                offsetY={-1}
                 width={160}
               />
               <Text
-                text={`${roomArea.sqMeters} m²  •  ${roomArea.sqFeet} sq ft`}
+                text={`${roomMetrics.sqMeters} m²  •  ${roomMetrics.sqFeet} sq ft`}
                 fontSize={11}
                 fontFamily="JetBrains Mono, monospace"
                 fontStyle="500"
-                fill="#34d399" // emerald-400
+                fill="#34d399"
                 align="center"
                 offsetX={80}
-                offsetY={-18}
+                offsetY={-20}
                 width={160}
               />
             </Group>
 
-            {/* ============================================================== */}
-            {/* Professional CAD Dimension Line: TOP (Width)                   */}
-            {/* ============================================================== */}
+            {/* CAD Dimension Line: TOP */}
             <Group y={-halfL - t - 32}>
-              {/* Left & Right Extension Lines */}
-              <Line
-                points={[-halfW, 26, -halfW, 0]}
-                stroke="#64748b"
-                strokeWidth={1}
-                dash={[2, 2]}
-              />
-              <Line
-                points={[halfW, 26, halfW, 0]}
-                stroke="#64748b"
-                strokeWidth={1}
-                dash={[2, 2]}
-              />
-
-              {/* Main Horizontal Dimension Line */}
-              <Line
-                points={[-halfW, 6, halfW, 6]}
-                stroke="#06b6d4" // cyan-500
-                strokeWidth={1.5}
-              />
-
-              {/* Architectural 45-degree Ticks */}
-              <Line
-                points={[-halfW - 4, 10, -halfW + 4, 2]}
-                stroke="#06b6d4"
-                strokeWidth={2}
-              />
-              <Line
-                points={[halfW - 4, 10, halfW + 4, 2]}
-                stroke="#06b6d4"
-                strokeWidth={2}
-              />
-
-              {/* Dimension Text Pill */}
-              <Rect
-                x={-50}
-                y={-8}
-                width={100}
-                height={20}
-                fill="#0f172a"
-                stroke="#06b6d4"
-                strokeWidth={1}
-                cornerRadius={4}
-              />
+              <Line points={[-halfTopW, 26, -halfTopW, 0]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+              <Line points={[halfTopW, 26, halfTopW, 0]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+              <Line points={[-halfTopW, 6, halfTopW, 6]} stroke="#06b6d4" strokeWidth={1.5} />
+              <Line points={[-halfTopW - 4, 10, -halfTopW + 4, 2]} stroke="#06b6d4" strokeWidth={2} />
+              <Line points={[halfTopW - 4, 10, halfTopW + 4, 2]} stroke="#06b6d4" strokeWidth={2} />
+              <Rect x={-50} y={-8} width={100} height={20} fill="#0f172a" stroke="#06b6d4" strokeWidth={1} cornerRadius={4} />
               <Text
-                text={formatMeasurement(room.widthMm, unit)}
+                text={formatMeasurement(isTrapezoid ? room.topWidthMm || 4000 : room.widthMm, unit)}
                 x={-50}
                 y={-5}
                 width={100}
@@ -446,55 +466,38 @@ export default function RoomCanvas({
               />
             </Group>
 
-            {/* ============================================================== */}
-            {/* Professional CAD Dimension Line: LEFT (Length/Height)          */}
-            {/* ============================================================== */}
-            <Group x={-halfW - t - 34}>
-              {/* Top & Bottom Extension Lines */}
-              <Line
-                points={[28, -halfL, 0, -halfL]}
-                stroke="#64748b"
-                strokeWidth={1}
-                dash={[2, 2]}
-              />
-              <Line
-                points={[28, halfL, 0, halfL]}
-                stroke="#64748b"
-                strokeWidth={1}
-                dash={[2, 2]}
-              />
-
-              {/* Main Vertical Dimension Line */}
-              <Line
-                points={[6, -halfL, 6, halfL]}
-                stroke="#06b6d4"
-                strokeWidth={1.5}
-              />
-
-              {/* Architectural 45-degree Ticks */}
-              <Line
-                points={[2, -halfL - 4, 10, -halfL + 4]}
-                stroke="#06b6d4"
-                strokeWidth={2}
-              />
-              <Line
-                points={[2, halfL - 4, 10, halfL + 4]}
-                stroke="#06b6d4"
-                strokeWidth={2}
-              />
-
-              {/* Dimension Text Pill (Rotated -90 for architectural readability) */}
-              <Group x={6} y={0} rotation={-90}>
-                <Rect
+            {/* CAD Dimension Line: BOTTOM (Trapezoid) */}
+            {isTrapezoid && (
+              <Group y={halfL + t + 20}>
+                <Line points={[-halfBottomW, -14, -halfBottomW, 10]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+                <Line points={[halfBottomW, -14, halfBottomW, 10]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+                <Line points={[-halfBottomW, 6, halfBottomW, 6]} stroke="#06b6d4" strokeWidth={1.5} />
+                <Line points={[-halfBottomW - 4, 10, -halfBottomW + 4, 2]} stroke="#06b6d4" strokeWidth={2} />
+                <Line points={[halfBottomW - 4, 10, halfBottomW + 4, 2]} stroke="#06b6d4" strokeWidth={2} />
+                <Rect x={-50} y={-4} width={100} height={20} fill="#0f172a" stroke="#06b6d4" strokeWidth={1} cornerRadius={4} />
+                <Text
+                  text={formatMeasurement(room.bottomWidthMm || 6000, unit)}
                   x={-50}
-                  y={-10}
+                  y={-1}
                   width={100}
-                  height={20}
-                  fill="#0f172a"
-                  stroke="#06b6d4"
-                  strokeWidth={1}
-                  cornerRadius={4}
+                  align="center"
+                  fontSize={11}
+                  fontFamily="JetBrains Mono, monospace"
+                  fontStyle="600"
+                  fill="#38bdf8"
                 />
+              </Group>
+            )}
+
+            {/* CAD Dimension Line: LEFT (Length/Height) */}
+            <Group x={-maxWPx / 2 - t - 34}>
+              <Line points={[28, -halfL, 0, -halfL]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+              <Line points={[28, halfL, 0, halfL]} stroke="#64748b" strokeWidth={1} dash={[2, 2]} />
+              <Line points={[6, -halfL, 6, halfL]} stroke="#06b6d4" strokeWidth={1.5} />
+              <Line points={[2, -halfL - 4, 10, -halfL + 4]} stroke="#06b6d4" strokeWidth={2} />
+              <Line points={[2, halfL - 4, 10, halfL + 4]} stroke="#06b6d4" strokeWidth={2} />
+              <Group x={6} y={0} rotation={-90}>
+                <Rect x={-50} y={-10} width={100} height={20} fill="#0f172a" stroke="#06b6d4" strokeWidth={1} cornerRadius={4} />
                 <Text
                   text={formatMeasurement(room.lengthMm, unit)}
                   x={-50}
@@ -509,6 +512,22 @@ export default function RoomCanvas({
               </Group>
             </Group>
           </Group>
+        </Layer>
+
+        {/* Layer 3: Placed Furniture Objects */}
+        <Layer>
+          {items.map((item) => (
+            <FurnitureItem
+              key={item.id}
+              item={item}
+              pxPerMm={BASE_PX_PER_MM}
+              isSelected={selectedId === item.id}
+              isOverlapping={overlappingIds.has(item.id)}
+              isOutside={outsideIds.has(item.id)}
+              onSelect={onSelect}
+              onChange={onChangeItem}
+            />
+          ))}
         </Layer>
       </Stage>
     </div>

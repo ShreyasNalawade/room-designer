@@ -47,4 +47,14 @@ export const ROOM_PRESETS = [
     lengthMm: 2800,
     description: '3.2m × 2.8m - efficient secondary bedroom',
   },
+  {
+    id: 'trapezoid-sunroom',
+    name: 'Angled Sunroom',
+    type: 'trapezoid',
+    topWidthMm: 4000,
+    bottomWidthMm: 6000,
+    widthMm: 6000,
+    lengthMm: 4500,
+    description: '4.0m / 6.0m × 4.5m - angled trapezoid alcove',
+  },
 ];
