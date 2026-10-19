@@ -12,6 +12,8 @@ import {
   FolderKanban,
   Plus,
   ChevronDown,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
 import { ROOM_PRESETS } from '../../constants/presets';
@@ -28,6 +30,10 @@ export default function HeaderToolbar({
   onResetDesign,
   onExportDesign,
   onImportDesign,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   lastSavedAt,
 }) {
   const [saveAnimation, setSaveAnimation] = useState(false);
@@ -160,6 +166,45 @@ export default function HeaderToolbar({
           )}
           <span className="hidden md:inline">{exportAnimation ? 'Exported!' : 'Export'}</span>
         </button>
+
+        {/* Undo & Redo Action Controls */}
+        <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-lg p-0.5 shadow-sm">
+          <button
+            type="button"
+            id="header-undo-btn"
+            data-testid="header-undo-btn"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-md text-xs font-medium transition cursor-pointer active:scale-95 ${
+              canUndo
+                ? 'text-slate-200 hover:text-white hover:bg-slate-800'
+                : 'text-slate-600 opacity-40 cursor-not-allowed'
+            }`}
+            title="Undo last action (Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Undo</span>
+          </button>
+          <div className="w-px h-3.5 bg-slate-800 my-auto" />
+          <button
+            type="button"
+            id="header-redo-btn"
+            data-testid="header-redo-btn"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-md text-xs font-medium transition cursor-pointer active:scale-95 ${
+              canRedo
+                ? 'text-slate-200 hover:text-white hover:bg-slate-800'
+                : 'text-slate-600 opacity-40 cursor-not-allowed'
+            }`}
+            title="Redo action (Ctrl+Y or Ctrl+Shift+Z)"
+            aria-label="Redo"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Redo</span>
+          </button>
+        </div>
 
         {/* Save to Local Browser Storage Button */}
         <button

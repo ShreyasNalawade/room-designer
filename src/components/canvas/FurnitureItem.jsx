@@ -17,13 +17,14 @@ export default function FurnitureItem({
   const d = (item.depthMm || item.heightMm || 600) * pxPerMm;
   const isLocked = !!item.locked;
 
-  // Attach Konva Transformer when selected
+  // Attach Konva Transformer when selected and update bounds on property changes (e.g. Undo/Redo)
   useEffect(() => {
     if (isSelected && trRef.current && shapeRef.current && !isLocked) {
       trRef.current.nodes([shapeRef.current]);
+      trRef.current.forceUpdate?.();
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [isSelected, isLocked]);
+  }, [isSelected, isLocked, item.widthMm, item.depthMm, item.rotation, item.x, item.y]);
 
   // Handle drag end in world coordinates
   const handleDragEnd = (e) => {

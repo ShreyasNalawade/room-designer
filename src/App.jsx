@@ -24,6 +24,7 @@ import {
 } from './utils/projectStorage';
 import { DEFAULT_UNIT } from './constants/units';
 import { rotateRoom, setRoomRotation } from './utils/orientation';
+import { useDesignHistory } from './utils/useDesignHistory';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function App() {
@@ -46,13 +47,30 @@ export default function App() {
     return projects.find((p) => p.id === activeProjectId) || projects[0] || null;
   }, [projects, activeProjectId]);
 
-  // Active Project Working State
+  // Active Project Working State & History Manager (Undo / Redo)
   const [unit, setUnit] = useState(() => activeProject?.unit || DEFAULT_UNIT);
-  const [room, setRoom] = useState(() => activeProject?.room || DEFAULT_STARTER_ROOM);
-  const [items, setItems] = useState(() => activeProject?.items || []);
   const [lastSavedAt, setLastSavedAt] = useState(() => activeProject?.updatedAt || null);
 
-  const [selectedId, setSelectedId] = useState(null);
+  const {
+    items,
+    room,
+    selectedId,
+    canUndo,
+    canRedo,
+    setItems,
+    setItem,
+    setRoom,
+    setRoomAndItems,
+    setSelectedId,
+    resetHistory,
+    undo: handleUndo,
+    redo: handleRedo,
+  } = useDesignHistory({
+    room: activeProject?.room || DEFAULT_STARTER_ROOM,
+    items: activeProject?.items || [],
+    selectedId: null,
+  });
+
   const [cursorCoord, setCursorCoord] = useState(null);
   const [activeDrawer, setActiveDrawer] = useState(null); // 'furniture' | 'room' | 'inspector' | null
   const [toast, setToast] = useState(null);
@@ -64,12 +82,14 @@ export default function App() {
     if (activeProject && activeProject.id !== activeIdRef.current) {
       activeIdRef.current = activeProject.id;
       setUnit(activeProject.unit || DEFAULT_UNIT);
-      setRoom(activeProject.room || DEFAULT_STARTER_ROOM);
-      setItems(activeProject.items || []);
+      resetHistory({
+        room: activeProject.room || DEFAULT_STARTER_ROOM,
+        items: activeProject.items || [],
+        selectedId: null,
+      });
       setLastSavedAt(activeProject.updatedAt || null);
-      setSelectedId(null);
     }
-  }, [activeProject]);
+  }, [activeProject, resetHistory]);
 
   // Debounced autosave whenever room, items, or unit change for active project
   useEffect(() => {
@@ -143,9 +163,11 @@ export default function App() {
         setActiveProjectId(newProj.id);
         activeIdRef.current = newProj.id;
         setUnit(newProj.unit);
-        setRoom(newProj.room);
-        setItems(newProj.items);
-        setSelectedId(null);
+        resetHistory({
+          room: newProj.room,
+          items: newProj.items,
+          selectedId: null,
+        });
         setLastSavedAt(newProj.updatedAt);
         handleCloseProjectHub();
         setToast({
@@ -154,7 +176,7 @@ export default function App() {
         });
       }
     },
-    [handleCloseProjectHub]
+    [handleCloseProjectHub, resetHistory]
   );
 
   // Select / Switch active project
@@ -166,9 +188,11 @@ export default function App() {
         setActiveProjectId(target.id);
         activeIdRef.current = target.id;
         setUnit(target.unit || DEFAULT_UNIT);
-        setRoom(target.room);
-        setItems(target.items || []);
-        setSelectedId(null);
+        resetHistory({
+          room: target.room,
+          items: target.items || [],
+          selectedId: null,
+        });
         setLastSavedAt(target.updatedAt);
         handleCloseProjectHub();
         setToast({
@@ -177,7 +201,7 @@ export default function App() {
         });
       }
     },
-    [projects, handleCloseProjectHub]
+    [projects, handleCloseProjectHub, resetHistory]
   );
 
   // Import JSON file as a project
@@ -191,9 +215,11 @@ export default function App() {
         setActiveProjectId(res.project.id);
         activeIdRef.current = res.project.id;
         setUnit(res.project.unit || DEFAULT_UNIT);
-        setRoom(res.project.room);
-        setItems(res.project.items || []);
-        setSelectedId(null);
+        resetHistory({
+          room: res.project.room,
+          items: res.project.items || [],
+          selectedId: null,
+        });
         setLastSavedAt(res.project.updatedAt);
         handleCloseProjectHub();
         setToast({
@@ -204,7 +230,7 @@ export default function App() {
         setToast({ message: `Import error: ${res.error}`, type: 'error' });
       }
     },
-    [handleCloseProjectHub]
+    [handleCloseProjectHub, resetHistory]
   );
 
   // Duplicate a project
@@ -246,7 +272,7 @@ export default function App() {
         setToast({ message: `Renamed to "${newName.trim()}"`, type: 'success' });
       }
     },
-    [activeProjectId]
+    [activeProjectId, setRoom]
   );
 
   // Save current project manually
@@ -289,16 +315,18 @@ export default function App() {
     }
   }, [activeProject, room, items, unit]);
 
-  // Reset current project to clean room
+  // Reset current project to clean room (records to history so reset can be undone if clicked by mistake)
   const handleResetDesign = () => {
     if (window.confirm('Reset this project design and start fresh? All uncommitted edits will be cleared.')) {
-      setRoom({
-        ...DEFAULT_STARTER_ROOM,
-        id: `room-${Date.now()}`,
-        name: activeProject?.name || 'Living Room Design',
-      });
-      setItems([]);
-      setSelectedId(null);
+      setRoomAndItems(
+        {
+          ...DEFAULT_STARTER_ROOM,
+          id: `room-${Date.now()}`,
+          name: activeProject?.name || 'Living Room Design',
+        },
+        [],
+        null
+      );
       setToast({ message: 'Reset current project to fresh room.', type: 'success' });
     }
   };
@@ -321,12 +349,12 @@ export default function App() {
   // Rotate entire room and all its components
   const handleRotateRoom = useCallback((deltaDeg = 90) => {
     setRoom((prev) => rotateRoom(prev, deltaDeg));
-  }, []);
+  }, [setRoom]);
 
   // Set entire room rotation to exact degree
   const handleSetRoomRotation = useCallback((targetDeg = 0) => {
     setRoom((prev) => setRoomRotation(prev, targetDeg));
-  }, []);
+  }, [setRoom]);
 
   // Add new furniture component from catalog into room
   const handleAddFurnitureItem = (catalogItem) => {
@@ -355,62 +383,74 @@ export default function App() {
   };
 
   // Update a single item
-  const handleChangeItem = (updated) => {
-    setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
-  };
+  const handleChangeItem = useCallback(
+    (updated, options = {}) => {
+      setItem(updated, options);
+    },
+    [setItem]
+  );
 
   // Duplicate an item
-  const handleDuplicateItem = useCallback((itemToDup) => {
-    const newItem = {
-      ...itemToDup,
-      id: `inst_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      name: `${itemToDup.name} (Copy)`,
-      x: itemToDup.x + 200,
-      y: itemToDup.y + 200,
-      locked: false,
-    };
-    setItems((prev) => [...prev, newItem]);
-    setSelectedId(newItem.id);
-  }, []);
+  const handleDuplicateItem = useCallback(
+    (itemToDup) => {
+      const newItem = {
+        ...itemToDup,
+        id: `inst_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        name: `${itemToDup.name} (Copy)`,
+        x: itemToDup.x + 200,
+        y: itemToDup.y + 200,
+        locked: false,
+      };
+      setItems((prev) => [...prev, newItem]);
+      setSelectedId(newItem.id);
+    },
+    [setItems, setSelectedId]
+  );
 
   // Delete an item
-  const handleDeleteItem = useCallback((itemId) => {
-    setItems((prev) => prev.filter((it) => it.id !== itemId));
-    setSelectedId((prev) => (prev === itemId ? null : prev));
-  }, []);
+  const handleDeleteItem = useCallback(
+    (itemId) => {
+      setItems((prev) => prev.filter((it) => it.id !== itemId));
+      setSelectedId((prev) => (prev === itemId ? null : prev));
+    },
+    [setItems, setSelectedId]
+  );
 
   // Rotate selected item
   const handleRotate = useCallback(
     (deg) => {
       if (!selectedItem || selectedItem.locked) return;
       const next = ((selectedItem.rotation || 0) + deg) % 360;
-      handleChangeItem({
+      setItem({
         ...selectedItem,
         rotation: next < 0 ? next + 360 : next,
       });
     },
-    [selectedItem]
+    [selectedItem, setItem]
   );
 
   // Toggle lock state
-  const handleToggleLock = useCallback((item) => {
-    handleChangeItem({
-      ...item,
-      locked: !item.locked,
-    });
-  }, []);
+  const handleToggleLock = useCallback(
+    (item) => {
+      setItem({
+        ...item,
+        locked: !item.locked,
+      });
+    },
+    [setItem]
+  );
 
   // Nudge item position
   const handleNudge = useCallback(
     (dx, dy) => {
       if (!selectedItem || selectedItem.locked) return;
-      handleChangeItem({
+      setItem({
         ...selectedItem,
         x: selectedItem.x + dx,
         y: selectedItem.y + dy,
       });
     },
-    [selectedItem]
+    [selectedItem, setItem]
   );
 
   // Fit to screen view
@@ -418,7 +458,7 @@ export default function App() {
     canvasRef.current?.fitToView?.();
   }, []);
 
-  // Global keyboard shortcuts (Esc, Delete, Ctrl+D, Arrow nudge)
+  // Global keyboard shortcuts (Ctrl+Z: Undo, Ctrl+Y/Cmd+Shift+Z: Redo, Esc, Delete, Ctrl+D, Arrow nudge)
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -426,7 +466,16 @@ export default function App() {
         return;
       }
 
-      if (e.key === 'Escape') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+      ) {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key === 'Escape') {
         setSelectedId(null);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
@@ -447,7 +496,7 @@ export default function App() {
         if (e.key === 'ArrowUp') dy = -step;
         if (e.key === 'ArrowDown') dy = step;
 
-        handleChangeItem({
+        setItem({
           ...selectedItem,
           x: selectedItem.x + dx,
           y: selectedItem.y + dy,
@@ -457,7 +506,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedItem, selectedId, handleDeleteItem, handleDuplicateItem]);
+  }, [selectedItem, selectedId, handleDeleteItem, handleDuplicateItem, handleUndo, handleRedo, setSelectedId, setItem]);
 
   return (
     <div className="flex flex-col h-full h-[100dvh] w-full max-w-full overflow-hidden bg-slate-950 font-sans relative select-none">
@@ -486,6 +535,10 @@ export default function App() {
         onResetDesign={handleResetDesign}
         onExportDesign={handleExportDesign}
         onImportDesign={handleImportProject}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
         lastSavedAt={lastSavedAt}
       />
 
@@ -516,10 +569,14 @@ export default function App() {
             onCursorMove={setCursorCoord}
             onRotateRoom={handleRotateRoom}
             onSetRotation={handleSetRoomRotation}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
             canvasRef={canvasRef}
           />
 
-          {/* Floating Mobile Action Bar (Erase, Rotate, Copy, Size, Nudge) */}
+          {/* Floating Mobile Action Bar (Erase, Rotate, Copy, Size, Nudge, Undo) */}
           {selectedItem && (
             <MobileActionBar
               selectedItem={selectedItem}
@@ -533,6 +590,8 @@ export default function App() {
               onNudge={handleNudge}
               onOpenProperties={() => setActiveDrawer('inspector')}
               onDeselect={() => setSelectedId(null)}
+              onUndo={handleUndo}
+              canUndo={canUndo}
             />
           )}
         </section>

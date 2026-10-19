@@ -83,7 +83,7 @@ export default function StatusBar({
 
       {/* Right: Keyboard Shortcuts Hint */}
       <div className="hidden lg:flex items-center gap-3 text-[11px] text-slate-500">
-        <span>Esc: Deselect • Del: Delete • Ctrl+D: Duplicate • Arrows: Nudge</span>
+        <span>Ctrl+Z: Undo • Ctrl+Y: Redo • Esc: Deselect • Del: Delete • Ctrl+D: Duplicate</span>
         <span className="text-slate-700">•</span>
         <span className="font-mono text-cyan-400/80 uppercase tracking-wider text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
           Phase 2 Active

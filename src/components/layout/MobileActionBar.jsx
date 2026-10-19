@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Sliders,
+  Undo2,
 } from 'lucide-react';
 import { formatMeasurement } from '../../utils/units';
 import { calculateWallClearances, calculateSpaceUtilization } from '../../utils/measurements';
@@ -26,6 +27,8 @@ export default function MobileActionBar({
   onNudge,
   onOpenProperties,
   onDeselect,
+  onUndo,
+  canUndo = false,
 }) {
   if (!selectedItem) return null;
 
@@ -51,14 +54,29 @@ export default function MobileActionBar({
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={onDeselect}
-          className="p-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white"
-          title="Deselect"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {canUndo && (
+            <button
+              type="button"
+              id="mobile-undo-btn"
+              data-testid="mobile-undo-btn"
+              onClick={onUndo}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-950/80 border border-cyan-700/80 text-cyan-300 hover:text-white hover:bg-cyan-900 active:scale-95 transition text-[10px] font-semibold cursor-pointer shadow-sm"
+              title="Undo accidental move or resize"
+            >
+              <Undo2 className="w-3 h-3 text-cyan-400" />
+              <span>Undo</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDeselect}
+            className="p-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white cursor-pointer"
+            title="Deselect"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Live Wall Clearances & Empty Space Badge */}

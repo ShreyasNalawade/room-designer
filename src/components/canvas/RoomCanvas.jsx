@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Line, Text, Group, Circle } from 'react-konva';
-import { Maximize2, RotateCcw, RotateCw, ZoomIn, ZoomOut, Grid as GridIcon, Move, Ruler } from 'lucide-react';
+import { Maximize2, RotateCcw, RotateCw, ZoomIn, ZoomOut, Grid as GridIcon, Move, Ruler, Undo2, Redo2 } from 'lucide-react';
 import FurnitureItem from './FurnitureItem';
 import CompassRose from './CompassRose';
 import { formatMeasurement, calculateRoomMetrics } from '../../utils/units';
@@ -24,6 +24,10 @@ export default function RoomCanvas({
   onCursorMove,
   onRotateRoom,
   onSetRotation,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   canvasRef,
 }) {
   const containerRef = useRef(null);
@@ -302,6 +306,37 @@ export default function RoomCanvas({
 
       {/* Floating Canvas Controls Overlay */}
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-1 sm:gap-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-1 sm:p-1.5 shadow-xl text-slate-300">
+        {/* Quick Undo & Redo on Canvas */}
+        <button
+          type="button"
+          id="canvas-undo-btn"
+          data-testid="canvas-undo-btn"
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Undo last action (Ctrl+Z)"
+          aria-label="Undo"
+          className={`p-1.5 sm:p-2 rounded transition cursor-pointer touch-manipulation active:scale-95 ${
+            canUndo ? 'hover:bg-slate-800 hover:text-white text-slate-300' : 'text-slate-600 opacity-40 cursor-not-allowed'
+          }`}
+        >
+          <Undo2 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          id="canvas-redo-btn"
+          data-testid="canvas-redo-btn"
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Redo action (Ctrl+Y or Ctrl+Shift+Z)"
+          aria-label="Redo"
+          className={`p-1.5 sm:p-2 rounded transition cursor-pointer touch-manipulation active:scale-95 ${
+            canRedo ? 'hover:bg-slate-800 hover:text-white text-slate-300' : 'text-slate-600 opacity-40 cursor-not-allowed'
+          }`}
+        >
+          <Redo2 className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-slate-800 my-auto mx-0.5" />
+
         <button
           type="button"
           onClick={() => zoomBy(1.2)}
