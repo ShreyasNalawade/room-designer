@@ -9,11 +9,17 @@ import {
   RotateCcw,
   Download,
   Upload,
+  FolderKanban,
+  Plus,
+  ChevronDown,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
 import { ROOM_PRESETS } from '../../constants/presets';
 
 export default function HeaderToolbar({
+  currentProject,
+  projectsCount = 1,
+  onOpenProjectHub,
   room,
   unit,
   onUnitChange,
@@ -48,23 +54,44 @@ export default function HeaderToolbar({
     }
   };
 
+  const projectName = currentProject?.name || room?.name || 'Project';
+
   return (
-    <header className="h-14 bg-slate-900 border-b border-slate-800 px-2.5 sm:px-4 flex items-center justify-between z-30 select-none">
-      {/* Brand & Title */}
+    <header className="h-14 bg-slate-900 border-b border-slate-800 px-2 sm:px-4 flex items-center justify-between z-30 select-none shrink-0">
+      {/* Brand & Projects Navigation */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-950/50">
           <Home className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
-        <div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="font-bold text-sm sm:text-base tracking-tight text-white">RoomCraft</span>
-            <span className="hidden sm:inline text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
-              Pro Floor Plan
-            </span>
-          </div>
-          <p className="hidden md:block text-[11px] text-slate-400 font-medium">
-            2D Architectural Floor Plan & Room Designer
-          </p>
+
+        {/* Project Selector & History Hub Trigger Button */}
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <button
+            type="button"
+            onClick={() => onOpenProjectHub?.('history')}
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-950/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 text-xs font-semibold shadow-sm transition cursor-pointer max-w-[130px] sm:max-w-[190px]"
+            title="Open Projects Hub & History"
+          >
+            <FolderKanban className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate text-[11px] sm:text-xs">{projectName}</span>
+            {projectsCount > 1 && (
+              <span className="hidden sm:inline-block text-[10px] font-mono px-1 rounded bg-slate-800 text-cyan-300 border border-slate-700">
+                {projectsCount}
+              </span>
+            )}
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 ml-0.5" />
+          </button>
+
+          {/* Quick New Project Button */}
+          <button
+            type="button"
+            onClick={() => onOpenProjectHub?.('new')}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 text-xs font-semibold transition cursor-pointer"
+            title="Create New Project"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New</span>
+          </button>
         </div>
       </div>
 

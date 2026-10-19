@@ -10,17 +10,19 @@ export default function CompassRose({
   onRotateRoom,
   onSetRotation,
 }) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
+  });
   const heading = getHeadingDirection(rotation);
 
   return (
     <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex flex-col items-start select-none">
       <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl p-2.5 sm:p-3 text-slate-200 transition-all duration-200">
         {/* Header / Collapse Bar */}
-        <div className="flex items-center justify-between gap-2.5 mb-1.5 cursor-pointer" onClick={() => setIsExpanded((v) => !v)}>
+        <div className="flex items-center justify-between gap-2 mb-1 cursor-pointer" onClick={() => setIsExpanded((v) => !v)}>
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
             <Compass className="w-4 h-4 text-rose-400" />
-            <span className="tracking-wide">Compass</span>
+            <span className="tracking-wide hidden sm:inline">Compass</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-rose-300">

@@ -6,58 +6,91 @@ import StatusBar from './components/layout/StatusBar';
 import MobileNavBar from './components/layout/MobileNavBar';
 import MobileActionBar from './components/layout/MobileActionBar';
 import RoomCanvas from './components/canvas/RoomCanvas';
+import ProjectHubModal from './components/modals/ProjectHubModal';
 import { validateRoomDimensions } from './utils/validation';
 import { analyzeItemCollisions } from './utils/collision';
 import {
-  saveDesign,
-  loadDesign,
-  clearSavedDesign,
-  exportDesignFile,
-  importDesignFromFile,
-} from './utils/storage';
+  getAllProjects,
+  getActiveProjectId,
+  setActiveProjectId,
+  saveProject,
+  createNewProject,
+  deleteProject,
+  duplicateProject,
+  renameProject,
+  exportProjectFile,
+  importProjectFromFile,
+  DEFAULT_STARTER_ROOM,
+} from './utils/projectStorage';
 import { DEFAULT_UNIT } from './constants/units';
 import { rotateRoom, setRoomRotation } from './utils/orientation';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
-const DEFAULT_STARTER_ROOM = {
-  id: 'room-1',
-  presetId: 'living-room',
-  name: 'Living Room (Spacious)',
-  shape: 'rectangle',
-  widthMm: 6000,
-  lengthMm: 4500,
-  topWidthMm: 4000,
-  bottomWidthMm: 6000,
-  rotation: 0,
-};
-
 export default function App() {
-  // Initialize state from localStorage if available
-  const [unit, setUnit] = useState(() => {
-    const saved = loadDesign();
-    return saved?.unit || DEFAULT_UNIT;
+  // 1. Multi-Project State
+  const [projects, setProjects] = useState(() => getAllProjects());
+  const [activeProjectId, setCurActiveProjectId] = useState(() => getActiveProjectId());
+
+  // Show Project Hub modal on first visit in session, or null if user already visited
+  const [showProjectHub, setShowProjectHub] = useState(() => {
+    try {
+      const hasVisited = sessionStorage.getItem('roomcraft_visited_session');
+      return hasVisited ? null : 'welcome';
+    } catch {
+      return 'welcome';
+    }
   });
 
-  const [room, setRoom] = useState(() => {
-    const saved = loadDesign();
-    return saved?.room || DEFAULT_STARTER_ROOM;
-  });
+  // Currently active project object
+  const activeProject = useMemo(() => {
+    return projects.find((p) => p.id === activeProjectId) || projects[0] || null;
+  }, [projects, activeProjectId]);
 
-  const [items, setItems] = useState(() => {
-    const saved = loadDesign();
-    return saved?.items || [];
-  });
+  // Active Project Working State
+  const [unit, setUnit] = useState(() => activeProject?.unit || DEFAULT_UNIT);
+  const [room, setRoom] = useState(() => activeProject?.room || DEFAULT_STARTER_ROOM);
+  const [items, setItems] = useState(() => activeProject?.items || []);
+  const [lastSavedAt, setLastSavedAt] = useState(() => activeProject?.updatedAt || null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [cursorCoord, setCursorCoord] = useState(null);
-  const [lastSavedAt, setLastSavedAt] = useState(() => {
-    const saved = loadDesign();
-    return saved?.savedAt || null;
-  });
-
   const [activeDrawer, setActiveDrawer] = useState(null); // 'furniture' | 'room' | 'inspector' | null
   const [toast, setToast] = useState(null);
   const canvasRef = useRef(null);
+  const activeIdRef = useRef(activeProjectId);
+
+  // Sync workspace state when active project switches
+  useEffect(() => {
+    if (activeProject && activeProject.id !== activeIdRef.current) {
+      activeIdRef.current = activeProject.id;
+      setUnit(activeProject.unit || DEFAULT_UNIT);
+      setRoom(activeProject.room || DEFAULT_STARTER_ROOM);
+      setItems(activeProject.items || []);
+      setLastSavedAt(activeProject.updatedAt || null);
+      setSelectedId(null);
+    }
+  }, [activeProject]);
+
+  // Debounced autosave whenever room, items, or unit change for active project
+  useEffect(() => {
+    if (!activeProjectId || !activeProject) return;
+    const timer = setTimeout(() => {
+      const now = new Date().toISOString();
+      const updatedProj = {
+        ...activeProject,
+        unit,
+        room,
+        items,
+        updatedAt: now,
+      };
+      saveProject(updatedProj);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === activeProjectId ? updatedProj : p))
+      );
+      setLastSavedAt(now);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [room, items, unit, activeProjectId, activeProject]);
 
   // Auto-dismiss toast after 3.5 seconds
   useEffect(() => {
@@ -84,18 +117,168 @@ export default function App() {
     [items, selectedId]
   );
 
-  // Save design to browser storage
-  const handleSaveDesign = useCallback(() => {
-    const res = saveDesign(room, items, unit);
-    if (res.success) {
-      setLastSavedAt(res.timestamp);
-      setToast({ message: 'Design successfully saved to browser storage!', type: 'success' });
-    }
-  }, [room, items, unit]);
+  // Open Project Hub modal in given view ('welcome' | 'new' | 'history')
+  const handleOpenProjectHub = useCallback((view = 'welcome') => {
+    setShowProjectHub(view);
+  }, []);
 
-  // Export design to downloadable .json file
+  // Close Project Hub modal and mark session as visited
+  const handleCloseProjectHub = useCallback(() => {
+    setShowProjectHub(null);
+    try {
+      sessionStorage.setItem('roomcraft_visited_session', 'true');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Create new project
+  const handleCreateProject = useCallback(
+    (projectParams) => {
+      const newProj = createNewProject(projectParams);
+      if (newProj) {
+        const all = getAllProjects();
+        setProjects(all);
+        setCurActiveProjectId(newProj.id);
+        setActiveProjectId(newProj.id);
+        activeIdRef.current = newProj.id;
+        setUnit(newProj.unit);
+        setRoom(newProj.room);
+        setItems(newProj.items);
+        setSelectedId(null);
+        setLastSavedAt(newProj.updatedAt);
+        handleCloseProjectHub();
+        setToast({
+          message: `Created project "${newProj.name}"!`,
+          type: 'success',
+        });
+      }
+    },
+    [handleCloseProjectHub]
+  );
+
+  // Select / Switch active project
+  const handleSelectProject = useCallback(
+    (projectId) => {
+      const target = projects.find((p) => p.id === projectId);
+      if (target) {
+        setCurActiveProjectId(target.id);
+        setActiveProjectId(target.id);
+        activeIdRef.current = target.id;
+        setUnit(target.unit || DEFAULT_UNIT);
+        setRoom(target.room);
+        setItems(target.items || []);
+        setSelectedId(null);
+        setLastSavedAt(target.updatedAt);
+        handleCloseProjectHub();
+        setToast({
+          message: `Switched to project "${target.name}"`,
+          type: 'success',
+        });
+      }
+    },
+    [projects, handleCloseProjectHub]
+  );
+
+  // Import JSON file as a project
+  const handleImportProject = useCallback(
+    async (file, customName) => {
+      const res = await importProjectFromFile(file, customName);
+      if (res.success && res.project) {
+        const all = getAllProjects();
+        setProjects(all);
+        setCurActiveProjectId(res.project.id);
+        setActiveProjectId(res.project.id);
+        activeIdRef.current = res.project.id;
+        setUnit(res.project.unit || DEFAULT_UNIT);
+        setRoom(res.project.room);
+        setItems(res.project.items || []);
+        setSelectedId(null);
+        setLastSavedAt(res.project.updatedAt);
+        handleCloseProjectHub();
+        setToast({
+          message: `Successfully imported "${res.project.name}" with ${res.project.items.length} components!`,
+          type: 'success',
+        });
+      } else {
+        setToast({ message: `Import error: ${res.error}`, type: 'error' });
+      }
+    },
+    [handleCloseProjectHub]
+  );
+
+  // Duplicate a project
+  const handleDuplicateProject = useCallback((projectId) => {
+    const res = duplicateProject(projectId);
+    if (res.success && res.project) {
+      setProjects(getAllProjects());
+      setToast({
+        message: `Project duplicated as "${res.project.name}"!`,
+        type: 'success',
+      });
+    }
+  }, []);
+
+  // Delete a project
+  const handleDeleteProject = useCallback(
+    (projectId) => {
+      const res = deleteProject(projectId);
+      if (res.success) {
+        const remaining = getAllProjects();
+        setProjects(remaining);
+        const nextActiveId = getActiveProjectId();
+        setCurActiveProjectId(nextActiveId);
+        setToast({ message: 'Project removed.', type: 'success' });
+      }
+    },
+    []
+  );
+
+  // Rename a project
+  const handleRenameProject = useCallback(
+    (projectId, newName) => {
+      const res = renameProject(projectId, newName);
+      if (res.success) {
+        setProjects(getAllProjects());
+        if (projectId === activeProjectId) {
+          setRoom((prev) => ({ ...prev, name: newName.trim() }));
+        }
+        setToast({ message: `Renamed to "${newName.trim()}"`, type: 'success' });
+      }
+    },
+    [activeProjectId]
+  );
+
+  // Save current project manually
+  const handleSaveDesign = useCallback(() => {
+    if (!activeProject) return;
+    const now = new Date().toISOString();
+    const updated = {
+      ...activeProject,
+      room,
+      items,
+      unit,
+      updatedAt: now,
+    };
+    saveProject(updated);
+    setProjects((prev) => prev.map((p) => (p.id === activeProject.id ? updated : p)));
+    setLastSavedAt(now);
+    setToast({
+      message: `Project "${activeProject.name}" successfully saved!`,
+      type: 'success',
+    });
+  }, [activeProject, room, items, unit]);
+
+  // Export current project to JSON file
   const handleExportDesign = useCallback(() => {
-    const res = exportDesignFile(room, items, unit);
+    if (!activeProject) return;
+    const currentSnapshot = {
+      ...activeProject,
+      room,
+      items,
+      unit,
+    };
+    const res = exportProjectFile(currentSnapshot);
     if (res.success) {
       setToast({
         message: `Exported design as "${res.fileName}"! You can import this on any device.`,
@@ -104,46 +287,19 @@ export default function App() {
     } else {
       setToast({ message: `Export error: ${res.error}`, type: 'error' });
     }
-  }, [room, items, unit]);
+  }, [activeProject, room, items, unit]);
 
-  // Import design from uploaded .json file
-  const handleImportDesign = useCallback(async (file) => {
-    const res = await importDesignFromFile(file);
-    if (res.success) {
-      setRoom(res.data.room);
-      setItems(res.data.items);
-      setUnit(res.data.unit);
-      setSelectedId(null);
-      setLastSavedAt(res.data.savedAt);
-      setToast({
-        message: `Successfully loaded "${res.data.room.name}" with ${res.data.items.length} components!`,
-        type: 'success',
-      });
-    } else {
-      setToast({ message: `Import error: ${res.error}`, type: 'error' });
-    }
-  }, []);
-
-  // Debounced autosave whenever edits happen
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      saveDesign(room, items, unit);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [room, items, unit]);
-
-  // Reset to new clean room design
+  // Reset current project to clean room
   const handleResetDesign = () => {
-    if (window.confirm('Reset this design and start fresh? All uncommitted edits will be cleared.')) {
-      clearSavedDesign();
+    if (window.confirm('Reset this project design and start fresh? All uncommitted edits will be cleared.')) {
       setRoom({
         ...DEFAULT_STARTER_ROOM,
         id: `room-${Date.now()}`,
+        name: activeProject?.name || 'Living Room Design',
       });
       setItems([]);
       setSelectedId(null);
-      setLastSavedAt(null);
-      setToast({ message: 'Started fresh room design.', type: 'success' });
+      setToast({ message: 'Reset current project to fresh room.', type: 'success' });
     }
   };
 
@@ -272,37 +428,24 @@ export default function App() {
 
       if (e.key === 'Escape') {
         setSelectedId(null);
-        setActiveDrawer(null);
-        return;
-      }
-
-      if (!selectedItem) return;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (!selectedItem.locked) {
-          e.preventDefault();
-          handleDeleteItem(selectedItem.id);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId) {
+          handleDeleteItem(selectedId);
         }
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        handleDuplicateItem(selectedItem);
-        return;
-      }
-
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (selectedItem.locked) return;
+        if (selectedItem) {
+          handleDuplicateItem(selectedItem);
+        }
+      } else if (e.key.startsWith('Arrow') && selectedItem && !selectedItem.locked) {
         e.preventDefault();
-        const step = e.shiftKey ? 250 : 50;
-
+        const step = e.shiftKey ? 200 : 50; // 200mm or 50mm
         let dx = 0;
         let dy = 0;
-        if (e.key === 'ArrowUp') dy = -step;
-        if (e.key === 'ArrowDown') dy = step;
         if (e.key === 'ArrowLeft') dx = -step;
         if (e.key === 'ArrowRight') dx = step;
+        if (e.key === 'ArrowUp') dy = -step;
+        if (e.key === 'ArrowDown') dy = step;
 
         handleChangeItem({
           ...selectedItem,
@@ -314,10 +457,10 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedItem, handleDeleteItem, handleDuplicateItem]);
+  }, [selectedItem, selectedId, handleDeleteItem, handleDuplicateItem]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans relative">
+    <div className="flex flex-col h-full h-[100dvh] w-full max-w-full overflow-hidden bg-slate-950 font-sans relative select-none">
       {/* Toast Notification Banner */}
       {toast && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-top-2 duration-200 text-xs font-medium bg-slate-900/95 border-slate-700 text-slate-100 max-w-[90vw]">
@@ -332,6 +475,9 @@ export default function App() {
 
       {/* 1. Top Navigation & Toolbar */}
       <HeaderToolbar
+        currentProject={activeProject}
+        projectsCount={projects.length}
+        onOpenProjectHub={handleOpenProjectHub}
         room={room}
         unit={unit}
         onUnitChange={setUnit}
@@ -339,12 +485,12 @@ export default function App() {
         onSaveDesign={handleSaveDesign}
         onResetDesign={handleResetDesign}
         onExportDesign={handleExportDesign}
-        onImportDesign={handleImportDesign}
+        onImportDesign={handleImportProject}
         lastSavedAt={lastSavedAt}
       />
 
       {/* 2. Main Workspace Layout */}
-      <main className="flex-1 flex flex-row overflow-hidden relative">
+      <main className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
         {/* Desktop Left Panel (Hidden on screens < lg) */}
         <LeftSidebar
           room={room}
@@ -357,7 +503,7 @@ export default function App() {
         />
 
         {/* Central Canvas Viewport: Full 100% width on Mobile! */}
-        <section className="flex-1 h-full relative overflow-hidden flex flex-col">
+        <section className="flex-1 min-h-0 h-full relative overflow-hidden flex flex-col">
           <RoomCanvas
             room={room}
             unit={unit}
@@ -491,9 +637,26 @@ export default function App() {
       <MobileNavBar
         activeDrawer={activeDrawer}
         onToggleDrawer={setActiveDrawer}
+        onOpenProjectHub={handleOpenProjectHub}
         onFitToView={handleFitToView}
         placedItemsCount={items.length}
         hasSelection={!!selectedItem}
+        projectsCount={projects.length}
+      />
+
+      {/* 6. Multi-Project Management & Welcome Modal */}
+      <ProjectHubModal
+        isOpen={!!showProjectHub}
+        initialView={showProjectHub || 'welcome'}
+        onClose={handleCloseProjectHub}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={handleSelectProject}
+        onCreateProject={handleCreateProject}
+        onImportProject={handleImportProject}
+        onDuplicateProject={handleDuplicateProject}
+        onDeleteProject={handleDeleteProject}
+        onRenameProject={handleRenameProject}
       />
     </div>
   );
