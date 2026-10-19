@@ -17,6 +17,7 @@ import {
   User,
   Users,
   BedDouble,
+  BrickWall,
   Plus,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
@@ -49,6 +50,11 @@ export default function RightPropertiesPanel({
   // If a furniture item is selected, render the Furniture Inspector
   if (selectedItem) {
     const isLocked = !!selectedItem.locked;
+    const isWall =
+      selectedItem.symbol === 'wall' ||
+      selectedItem.symbol === 'wall-glass' ||
+      selectedItem.symbol === 'wall-partition' ||
+      selectedItem.category === 'walls';
     const widthDisplay = fromMm(selectedItem.widthMm, unit);
     const depthDisplay = fromMm(selectedItem.depthMm || selectedItem.heightMm, unit);
     const xDisplay = fromMm(selectedItem.x, unit);
@@ -332,19 +338,249 @@ export default function RightPropertiesPanel({
             </div>
           )}
 
+          {/* Partition Wall Controls (Visible when a wall component is selected) */}
+          {isWall && (
+            <div className="space-y-3.5 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-700/90 rounded-xl p-3.5 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <BrickWall className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-100">
+                    Partition Wall Controls
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/80">
+                  {selectedItem.symbol === 'wall-glass' ? 'Glass Partition' : 'Solid Wall'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Set custom wall length, thickness, and rotation angle to partition rooms and divide spaces.
+              </p>
+
+              {/* Quick Wall Length Presets */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-300 font-semibold">Wall Length Presets:</span>
+                  <span className="font-mono text-cyan-400 font-bold">
+                    {formatMeasurement(selectedItem.widthMm, unit)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { label: '1.2m', mm: 1200 },
+                    { label: '2.0m', mm: 2000 },
+                    { label: '3.0m', mm: 3000 },
+                    { label: '4.0m', mm: 4000 },
+                  ].map(({ label, mm }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onChangeItem({ ...selectedItem, widthMm: mm })}
+                      className={`py-1.5 px-1 rounded-lg border text-xs font-mono font-semibold transition cursor-pointer disabled:opacity-40 ${
+                        selectedItem.widthMm === mm
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Thickness Presets */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-300 font-semibold">Wall Thickness (Width):</span>
+                  <span className="font-mono text-cyan-400 font-bold">
+                    {formatMeasurement(selectedItem.depthMm || selectedItem.heightMm, unit)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: '10cm', mm: 100, desc: 'Drywall' },
+                    { label: '15cm', mm: 150, desc: 'Standard' },
+                    { label: '20cm', mm: 200, desc: 'Masonry' },
+                  ].map(({ label, mm, desc }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => onChangeItem({ ...selectedItem, depthMm: mm })}
+                      className={`py-1.5 px-1 rounded-lg border text-center transition cursor-pointer disabled:opacity-40 flex flex-col items-center ${
+                        (selectedItem.depthMm || selectedItem.heightMm) === mm
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-xs font-mono font-bold">{label}</span>
+                      <span className="text-[9px] opacity-70">{desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dedicated Wall Rotation & Angle Controls */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-200 font-bold flex items-center gap-1.5">
+                    <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
+                    Wall Rotation
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="360"
+                      step="5"
+                      disabled={isLocked}
+                      value={selectedItem.rotation || 0}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) {
+                          onChangeItem({
+                            ...selectedItem,
+                            rotation: ((val % 360) + 360) % 360,
+                          });
+                        }
+                      }}
+                      className="w-14 bg-slate-900 border border-slate-700 text-center font-mono text-xs rounded px-1 py-0.5 text-cyan-300 outline-none focus:border-cyan-500"
+                    />
+                    <span className="text-xs text-slate-400">°</span>
+                  </div>
+                </div>
+
+                {/* Range Slider for free rotation */}
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  step="5"
+                  disabled={isLocked}
+                  value={selectedItem.rotation || 0}
+                  onChange={(e) =>
+                    onChangeItem({
+                      ...selectedItem,
+                      rotation: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full accent-cyan-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                />
+
+                {/* 4 Quick Alignment Buttons */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { label: '0° Horiz.', deg: 0, icon: '—' },
+                    { label: '90° Vert.', deg: 90, icon: '|' },
+                    { label: '45° Angle', deg: 45, icon: '/' },
+                    { label: '135° Angle', deg: 135, icon: '\\' },
+                  ].map(({ label, deg, icon }) => (
+                    <button
+                      key={deg}
+                      type="button"
+                      title={label}
+                      disabled={isLocked}
+                      onClick={() => onChangeItem({ ...selectedItem, rotation: deg })}
+                      className={`py-1.5 rounded-lg border text-center transition cursor-pointer disabled:opacity-40 ${
+                        (selectedItem.rotation || 0) === deg
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500 font-bold'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-xs font-mono block">{icon}</span>
+                      <span className="text-[10px] block">{deg}°</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick Step Rotation Buttons */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => rotateBy(-90)}
+                    className="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3 text-cyan-400" />
+                    <span>-90°</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => rotateBy(45)}
+                    className="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <RotateCw className="w-3 h-3 text-cyan-400" />
+                    <span>+45°</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => rotateBy(90)}
+                    className="py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <RotateCw className="w-3 h-3 text-cyan-400" />
+                    <span>+90°</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Duplication & Partition Building Actions */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rad = ((selectedItem.rotation || 0) * Math.PI) / 180;
+                    const perpX = Math.round(-Math.sin(rad) * 1500) || 0;
+                    const perpY = Math.round(Math.cos(rad) * 1500) || 0;
+                    onDuplicateItem({
+                      ...selectedItem,
+                      x: selectedItem.x + perpX,
+                      y: selectedItem.y + perpY,
+                    });
+                  }}
+                  className="py-1.5 px-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  title="Duplicate parallel partition wall 1.5m away"
+                >
+                  <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>+ Parallel Wall</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rad = ((selectedItem.rotation || 0) * Math.PI) / 180;
+                    const inlineX = Math.round(Math.cos(rad) * selectedItem.widthMm) || 0;
+                    const inlineY = Math.round(Math.sin(rad) * selectedItem.widthMm) || 0;
+                    onDuplicateItem({
+                      ...selectedItem,
+                      x: selectedItem.x + inlineX,
+                      y: selectedItem.y + inlineY,
+                    });
+                  }}
+                  className="py-1.5 px-2 rounded-lg bg-cyan-950/60 border border-cyan-800/80 hover:bg-cyan-900/60 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  title="Extend partition wall end-to-end"
+                >
+                  <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>+ Extend End</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Dimensions Controls */}
           <div className="space-y-3 bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Component Size
+                {isWall ? 'Wall Length & Thickness' : 'Component Size'}
               </span>
               <span className="text-[10px] font-mono text-cyan-400">{currentUnit.symbol}</span>
             </div>
 
-            {/* Width */}
+            {/* Width / Wall Length */}
             <div className="space-y-1">
               <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Width</span>
+                <span>{isWall ? 'Wall Length (Span)' : 'Width'}</span>
                 <span className="font-mono text-slate-200">{formatMeasurement(selectedItem.widthMm, unit)}</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -380,10 +616,10 @@ export default function RightPropertiesPanel({
               </div>
             </div>
 
-            {/* Depth */}
+            {/* Depth / Wall Thickness */}
             <div className="space-y-1">
               <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Depth / Height</span>
+                <span>{isWall ? 'Wall Thickness (Width)' : 'Depth / Height'}</span>
                 <span className="font-mono text-slate-200">
                   {formatMeasurement(selectedItem.depthMm || selectedItem.heightMm, unit)}
                 </span>

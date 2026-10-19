@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, X, Users, Bed, Sofa, Utensils, Briefcase, CookingPot, Bath, Archive, DoorOpen } from 'lucide-react';
+import { Search, Plus, X, BrickWall, Users, Bed, Sofa, Utensils, Briefcase, CookingPot, Bath, Archive, DoorOpen } from 'lucide-react';
 import { CATEGORIES, FURNITURE_CATALOG } from '../../constants/catalog';
 import { formatMeasurement } from '../../utils/units';
 
 const CATEGORY_ICONS = {
+  walls: BrickWall,
   people: Users,
   bedroom: Bed,
   living: Sofa,

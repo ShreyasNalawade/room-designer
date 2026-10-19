@@ -48,8 +48,12 @@ export default function FurnitureItem({
     node.scaleX(1);
     node.scaleY(1);
 
-    const newWidthMm = Math.max(Math.round((w * scaleX) / pxPerMm), 200);
-    const newDepthMm = Math.max(Math.round((d * scaleY) / pxPerMm), 200);
+    const isWall = item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls';
+    const minW = isWall ? 100 : 200;
+    const minD = isWall ? 40 : 200;
+
+    const newWidthMm = Math.max(Math.round((w * scaleX) / pxPerMm), minW);
+    const newDepthMm = Math.max(Math.round((d * scaleY) / pxPerMm), minD);
     const newRotation = Math.round(node.rotation() % 360);
     const newX_mm = Math.round(node.x() / pxPerMm);
     const newY_mm = Math.round(node.y() / pxPerMm);
@@ -965,6 +969,113 @@ export default function FurnitureItem({
         );
       }
 
+      case 'wall':
+      case 'wall-partition': {
+        const isHorizontal = w >= d;
+        const thickness = Math.min(w, d);
+        const length = Math.max(w, d);
+        const hatchStep = Math.max(thickness * 0.85, 10);
+        const hatchCount = Math.max(1, Math.floor(length / hatchStep));
+
+        return (
+          <>
+            {/* Solid Masonry Architectural Wall Core */}
+            <Rect
+              width={w}
+              height={d}
+              fill="#1e293b"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              cornerRadius={1}
+            />
+
+            {/* Architectural 45-degree CAD Section Hatching */}
+            {isHorizontal ? (
+              Array.from({ length: hatchCount }).map((_, i) => {
+                const x0 = i * hatchStep;
+                return (
+                  <Line
+                    key={i}
+                    points={[x0, d, Math.min(x0 + d, w), 0]}
+                    stroke="rgba(148, 163, 184, 0.4)"
+                    strokeWidth={1}
+                  />
+                );
+              })
+            ) : (
+              Array.from({ length: hatchCount }).map((_, i) => {
+                const y0 = i * hatchStep;
+                return (
+                  <Line
+                    key={i}
+                    points={[0, y0, w, Math.min(y0 + w, d)]}
+                    stroke="rgba(148, 163, 184, 0.4)"
+                    strokeWidth={1}
+                  />
+                );
+              })
+            )}
+
+            {/* Drywall / Plaster Finish Edge Lines */}
+            {isHorizontal ? (
+              <>
+                <Line points={[0, 1, w, 1]} stroke="#94a3b8" strokeWidth={1} />
+                <Line points={[0, d - 1, w, d - 1]} stroke="#94a3b8" strokeWidth={1} />
+                {/* Wall End Joint Caps */}
+                <Line points={[0, 0, 0, d]} stroke="#cbd5e1" strokeWidth={2} />
+                <Line points={[w, 0, w, d]} stroke="#cbd5e1" strokeWidth={2} />
+              </>
+            ) : (
+              <>
+                <Line points={[1, 0, 1, d]} stroke="#94a3b8" strokeWidth={1} />
+                <Line points={[w - 1, 0, w - 1, d]} stroke="#94a3b8" strokeWidth={1} />
+                {/* Wall End Joint Caps */}
+                <Line points={[0, 0, w, 0]} stroke="#cbd5e1" strokeWidth={2} />
+                <Line points={[0, d, w, d]} stroke="#cbd5e1" strokeWidth={2} />
+              </>
+            )}
+          </>
+        );
+      }
+
+      case 'wall-glass': {
+        const isHorizontal = w >= d;
+
+        return (
+          <>
+            {/* Translucent Acoustic Glass Partition */}
+            <Rect
+              width={w}
+              height={d}
+              fill="rgba(14, 165, 233, 0.22)"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              cornerRadius={2}
+            />
+
+            {/* Acoustic Center Glass Pane */}
+            {isHorizontal ? (
+              <Line points={[0, d / 2, w, d / 2]} stroke="#38bdf8" strokeWidth={2} />
+            ) : (
+              <Line points={[w / 2, 0, w / 2, d]} stroke="#38bdf8" strokeWidth={2} />
+            )}
+
+            {/* Glass Metal Glazing Clips */}
+            {isHorizontal ? (
+              <>
+                <Rect x={0} y={0} width={4} height={d} fill="#64748b" cornerRadius={1} />
+                <Rect x={w - 4} y={0} width={4} height={d} fill="#64748b" cornerRadius={1} />
+              </>
+            ) : (
+              <>
+                <Rect x={0} y={0} width={w} height={4} fill="#64748b" cornerRadius={1} />
+                <Rect x={0} y={d - 4} width={w} height={4} fill="#64748b" cornerRadius={1} />
+              </>
+            )}
+          </>
+        );
+      }
+
       default: {
         return (
           <Rect
@@ -1010,16 +1121,22 @@ export default function FurnitureItem({
         {renderSymbol()}
 
         {/* Item Label */}
-        {w >= 30 && d >= 20 && (
+        {w >= 30 && (d >= 20 || (item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls')) && (
           <Text
-            text={item.name}
+            text={
+              item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls'
+                ? `${item.name} (${((item.widthMm || 2000) / 1000).toFixed(1)}m)`
+                : item.name
+            }
             x={
               item.symbol === 'person-sleeping' && w >= d
                 ? w * 0.35
                 : 2
             }
             y={
-              item.symbol === 'person-standing'
+              item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls'
+                ? d <= 20 ? -16 : d / 2 - 5
+                : item.symbol === 'person-standing'
                 ? d - 14
                 : item.symbol === 'person-sleeping' && d > w
                 ? d * 0.55
@@ -1034,7 +1151,7 @@ export default function FurnitureItem({
             fontSize={Math.max(Math.min(w * 0.13, 10), 8)}
             fontFamily="Inter, sans-serif"
             fontStyle="600"
-            fill="#f8fafc"
+            fill={(item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls') && d <= 20 ? '#cbd5e1' : '#f8fafc'}
             listening={false}
           />
         )}
@@ -1050,8 +1167,10 @@ export default function FurnitureItem({
         <Transformer
           ref={trRef}
           boundBoxFunc={(oldBox, newBox) => {
-            // Enforce minimum dimension of 200mm (~20px)
-            if (newBox.width < 20 || newBox.height < 20) {
+            const isWall = item.symbol === 'wall' || item.symbol === 'wall-glass' || item.category === 'walls';
+            const minBoxW = isWall ? 8 : 20;
+            const minBoxH = isWall ? 4 : 20;
+            if (newBox.width < minBoxW || newBox.height < minBoxH) {
               return oldBox;
             }
             return newBox;

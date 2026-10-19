@@ -1,5 +1,6 @@
 export const CATEGORIES = [
   { id: 'all', name: 'All Items' },
+  { id: 'walls', name: 'Walls & Partitions' },
   { id: 'people', name: 'People & Testing' },
   { id: 'bedroom', name: 'Bedroom' },
   { id: 'living', name: 'Living Room' },
@@ -12,6 +13,48 @@ export const CATEGORIES = [
 ];
 
 export const FURNITURE_CATALOG = [
+  // Walls & Architectural Partitions
+  {
+    id: 'wall-partition',
+    category: 'walls',
+    name: 'Interior Partition Wall',
+    widthMm: 2000, // Length of wall
+    depthMm: 150,  // Thickness of wall (15cm)
+    symbol: 'wall',
+    color: '#64748b', // slate-500
+    description: '2.0m partition wall - customize length, thickness, and rotation',
+  },
+  {
+    id: 'wall-divider',
+    category: 'walls',
+    name: 'Room Divider Wall',
+    widthMm: 1200,
+    depthMm: 120,
+    symbol: 'wall',
+    color: '#94a3b8',
+    description: '1.2m short partition divider wall for dividing spaces',
+  },
+  {
+    id: 'wall-structural',
+    category: 'walls',
+    name: 'Masonry Wall (3m)',
+    widthMm: 3000,
+    depthMm: 200,
+    symbol: 'wall',
+    color: '#475569',
+    description: '3.0m heavy architectural masonry wall (20cm thickness)',
+  },
+  {
+    id: 'wall-glass',
+    category: 'walls',
+    name: 'Glass Partition Screen',
+    widthMm: 1800,
+    depthMm: 80,
+    symbol: 'wall-glass',
+    color: '#0284c7',
+    description: '1.8m acoustic glass partition screen for modern room zoning',
+  },
+
   // People & Capacity Testing (Standing / Sleeping 2D Top View)
   {
     id: 'person-standing',
