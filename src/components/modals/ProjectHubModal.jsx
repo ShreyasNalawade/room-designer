@@ -36,7 +36,7 @@ export default function ProjectHubModal({
   initialView = 'welcome', // 'welcome' | 'new' | 'history'
 }) {
   const [view, setView] = useState(initialView);
-  const [projectName, setProjectName] = useState('');
+  const [projectName, setProjectName] = useState(() => `Room Design ${projects.length + 1}`);
   const [selectedPresetId, setSelectedPresetId] = useState('living-room');
   const [selectedUnit, setSelectedUnit] = useState('m');
   const [searchQuery, setSearchQuery] = useState('');
@@ -251,7 +251,6 @@ export default function ProjectHubModal({
                 </label>
                 <input
                   type="text"
-                  required
                   autoFocus
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}

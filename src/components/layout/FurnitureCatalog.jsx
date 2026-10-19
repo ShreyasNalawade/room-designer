@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, X, Bed, Sofa, Utensils, Briefcase, CookingPot, Bath, Archive, DoorOpen } from 'lucide-react';
+import { Search, Plus, X, Users, Bed, Sofa, Utensils, Briefcase, CookingPot, Bath, Archive, DoorOpen } from 'lucide-react';
 import { CATEGORIES, FURNITURE_CATALOG } from '../../constants/catalog';
 import { formatMeasurement } from '../../utils/units';
 
 const CATEGORY_ICONS = {
+  people: Users,
   bedroom: Bed,
   living: Sofa,
   dining: Utensils,
@@ -39,7 +40,7 @@ export default function FurnitureCatalog({ unit, onAddItem }) {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search beds, sofas, desks, sinks..."
+          placeholder="Search people, beds, sofas, desks, sleeping..."
           className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 text-slate-200 text-xs rounded-lg pl-8 pr-7 py-2 outline-none transition placeholder:text-slate-600"
         />
         {searchQuery && (

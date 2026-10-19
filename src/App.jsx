@@ -552,6 +552,7 @@ export default function App() {
           onRotateRoom={handleRotateRoom}
           onSetRotation={handleSetRoomRotation}
           totalItemsCount={items.length}
+          onAddFurnitureItem={handleAddFurnitureItem}
         />
       </main>
 
@@ -615,6 +616,7 @@ export default function App() {
               onSetRotation={handleSetRoomRotation}
               isMobileDrawer={true}
               onClose={() => setActiveDrawer(null)}
+              onAddFurnitureItem={handleAddFurnitureItem}
             />
           </div>
         </div>

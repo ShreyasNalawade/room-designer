@@ -1,5 +1,6 @@
 export const CATEGORIES = [
   { id: 'all', name: 'All Items' },
+  { id: 'people', name: 'People & Testing' },
   { id: 'bedroom', name: 'Bedroom' },
   { id: 'living', name: 'Living Room' },
   { id: 'dining', name: 'Dining' },
@@ -11,6 +12,58 @@ export const CATEGORIES = [
 ];
 
 export const FURNITURE_CATALOG = [
+  // People & Capacity Testing (Standing / Sleeping 2D Top View)
+  {
+    id: 'person-standing',
+    category: 'people',
+    name: 'Person (Standing / Circle)',
+    widthMm: 500,
+    depthMm: 500,
+    symbol: 'person-standing',
+    color: '#ec4899', // pink-500
+    description: '50cm top-down circular human figure for scale and room testing',
+  },
+  {
+    id: 'person-sleeping-horizontal',
+    category: 'people',
+    name: 'Person (Sleeping Horizontal)',
+    widthMm: 1850,
+    depthMm: 650,
+    symbol: 'person-sleeping',
+    color: '#f43f5e', // rose-500
+    description: '185cm × 65cm horizontal 2D sleeping figure to test room sleeping capacity',
+  },
+  {
+    id: 'person-sleeping-vertical',
+    category: 'people',
+    name: 'Person (Sleeping Vertical)',
+    widthMm: 650,
+    depthMm: 1850,
+    symbol: 'person-sleeping',
+    color: '#f43f5e', // rose-500
+    description: '65cm × 185cm vertical 2D sleeping figure to test room length capacity',
+  },
+  {
+    id: 'person-sleeping-mat',
+    category: 'people',
+    name: 'Person on Sleeping Mat',
+    widthMm: 1900,
+    depthMm: 800,
+    symbol: 'person-sleeping-mat',
+    color: '#e11d48', // rose-600
+    description: '190cm × 80cm floor mat & sleeping person to test floor bed capacity',
+  },
+  {
+    id: 'people-sleeping-double',
+    category: 'people',
+    name: '2 People Sleeping (Double)',
+    widthMm: 1900,
+    depthMm: 1400,
+    symbol: 'people-sleeping-double',
+    color: '#db2777', // pink-600
+    description: '190cm × 140cm two persons sleeping side by side for room occupancy testing',
+  },
+
   // Bedroom
   {
     id: 'bed-single',

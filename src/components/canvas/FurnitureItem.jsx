@@ -487,6 +487,484 @@ export default function FurnitureItem({
         );
       }
 
+      case 'person-standing': {
+        const minDim = Math.min(w, d);
+        const headRadius = minDim * 0.22;
+        const shoulderRadius = minDim * 0.42;
+
+        return (
+          <>
+            {/* Outer personal clearance circle footprint */}
+            <Circle
+              x={w / 2}
+              y={d / 2}
+              radius={minDim / 2 - 1}
+              fill="#500724"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+            />
+            {/* Dashed ergonomic movement clearance perimeter */}
+            <Circle
+              x={w / 2}
+              y={d / 2}
+              radius={minDim / 2 - 3}
+              stroke="#f472b6"
+              strokeWidth={1}
+              dash={[3, 3]}
+            />
+            {/* Shoulders / Torso oval (top view architectural contour) */}
+            <Rect
+              x={w / 2 - shoulderRadius}
+              y={d / 2 - shoulderRadius * 0.52}
+              width={shoulderRadius * 2}
+              height={shoulderRadius * 1.04}
+              fill="#db2777"
+              stroke="#fbcfe8"
+              strokeWidth={1}
+              cornerRadius={shoulderRadius * 0.45}
+            />
+            {/* Left and Right arms / hands indication */}
+            <Circle
+              x={w / 2 - shoulderRadius + 3}
+              y={d / 2}
+              radius={minDim * 0.08}
+              fill="#be185d"
+            />
+            <Circle
+              x={w / 2 + shoulderRadius - 3}
+              y={d / 2}
+              radius={minDim * 0.08}
+              fill="#be185d"
+            />
+            {/* Head circle */}
+            <Circle
+              x={w / 2}
+              y={d / 2}
+              radius={headRadius}
+              fill="#fff1f2"
+              stroke="#be185d"
+              strokeWidth={1.5}
+            />
+            {/* Facing direction pointer (North / top) */}
+            <Line
+              points={[w / 2, d / 2 - headRadius + 1, w / 2, d / 2 - headRadius - 5]}
+              stroke="#be185d"
+              strokeWidth={2}
+            />
+          </>
+        );
+      }
+
+      case 'person-sleeping': {
+        const isHorizontal = w >= d;
+
+        if (isHorizontal) {
+          // Horizontal sleeping figure (e.g. 1850mm width x 650mm depth)
+          const pillowW = Math.min(w * 0.16, 50);
+          const pillowH = d - 12;
+          const headRadius = Math.min(d * 0.26, 18);
+
+          return (
+            <>
+              {/* Mattress / Sleeping Floor Boundary */}
+              <Rect
+                width={w}
+                height={d}
+                fill="#4c0519"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                cornerRadius={5}
+              />
+              {/* Pillow at left */}
+              <Rect
+                x={6}
+                y={6}
+                width={pillowW}
+                height={pillowH}
+                fill="#f43f5e"
+                stroke="#fda4af"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              {/* Sleeping Head on Pillow */}
+              <Circle
+                x={6 + pillowW / 2}
+                y={d / 2}
+                radius={headRadius}
+                fill="#fff1f2"
+                stroke="#be185d"
+                strokeWidth={1.5}
+              />
+              {/* Upper Body / Shoulders */}
+              <Rect
+                x={6 + pillowW}
+                y={d * 0.18}
+                width={Math.min(w * 0.22, 60)}
+                height={d * 0.64}
+                fill="#db2777"
+                cornerRadius={4}
+              />
+              {/* Blanket / Duvet Covering Body */}
+              <Rect
+                x={w * 0.35}
+                y={5}
+                width={w - w * 0.35 - 5}
+                height={d - 10}
+                fill="#831843"
+                stroke="#f472b6"
+                strokeWidth={1}
+                cornerRadius={[0, 4, 4, 0]}
+              />
+              {/* Duvet Fold Line across body */}
+              <Line
+                points={[w * 0.35, 5, w * 0.35, d - 5]}
+                stroke="#fbcfe8"
+                strokeWidth={2}
+              />
+              {/* Blanket crease details */}
+              <Line
+                points={[w * 0.58, 10, w * 0.58, d - 10]}
+                stroke="rgba(251, 207, 232, 0.4)"
+                strokeWidth={1}
+                dash={[4, 4]}
+              />
+              <Line
+                points={[w * 0.78, 10, w * 0.78, d - 10]}
+                stroke="rgba(251, 207, 232, 0.4)"
+                strokeWidth={1}
+                dash={[4, 4]}
+              />
+              {/* Feet / Foot end indication */}
+              <Line
+                points={[w - 8, d * 0.32, w - 8, d * 0.68]}
+                stroke="#be185d"
+                strokeWidth={2}
+              />
+            </>
+          );
+        } else {
+          // Vertical sleeping figure (e.g. 650mm width x 1850mm depth)
+          const pillowW = w - 12;
+          const pillowH = Math.min(d * 0.16, 50);
+          const headRadius = Math.min(w * 0.26, 18);
+
+          return (
+            <>
+              {/* Mattress / Sleeping Floor Boundary */}
+              <Rect
+                width={w}
+                height={d}
+                fill="#4c0519"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                cornerRadius={5}
+              />
+              {/* Pillow at top */}
+              <Rect
+                x={6}
+                y={6}
+                width={pillowW}
+                height={pillowH}
+                fill="#f43f5e"
+                stroke="#fda4af"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              {/* Head on Pillow */}
+              <Circle
+                x={w / 2}
+                y={6 + pillowH / 2}
+                radius={headRadius}
+                fill="#fff1f2"
+                stroke="#be185d"
+                strokeWidth={1.5}
+              />
+              {/* Upper Body / Shoulders */}
+              <Rect
+                x={w * 0.18}
+                y={6 + pillowH}
+                width={w * 0.64}
+                height={Math.min(d * 0.22, 60)}
+                fill="#db2777"
+                cornerRadius={4}
+              />
+              {/* Blanket / Duvet Covering Body */}
+              <Rect
+                x={5}
+                y={d * 0.35}
+                width={w - 10}
+                height={d - d * 0.35 - 5}
+                fill="#831843"
+                stroke="#f472b6"
+                strokeWidth={1}
+                cornerRadius={[0, 0, 4, 4]}
+              />
+              {/* Duvet Fold Line */}
+              <Line
+                points={[5, d * 0.35, w - 5, d * 0.35]}
+                stroke="#fbcfe8"
+                strokeWidth={2}
+              />
+              {/* Blanket crease details */}
+              <Line
+                points={[10, d * 0.58, w - 10, d * 0.58]}
+                stroke="rgba(251, 207, 232, 0.4)"
+                strokeWidth={1}
+                dash={[4, 4]}
+              />
+              <Line
+                points={[10, d * 0.78, w - 10, d * 0.78]}
+                stroke="rgba(251, 207, 232, 0.4)"
+                strokeWidth={1}
+                dash={[4, 4]}
+              />
+              {/* Feet / Foot end indication */}
+              <Line
+                points={[w * 0.32, d - 8, w * 0.68, d - 8]}
+                stroke="#be185d"
+                strokeWidth={2}
+              />
+            </>
+          );
+        }
+      }
+
+      case 'person-sleeping-mat': {
+        const isHorizontal = w >= d;
+        const matMargin = 5;
+
+        return (
+          <>
+            {/* Floor Mat Perimeter with stitched look */}
+            <Rect
+              width={w}
+              height={d}
+              fill="#371b26"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              cornerRadius={6}
+            />
+            <Rect
+              x={matMargin}
+              y={matMargin}
+              width={w - matMargin * 2}
+              height={d - matMargin * 2}
+              stroke="#fb7185"
+              strokeWidth={1}
+              dash={[4, 3]}
+              cornerRadius={4}
+            />
+            {/* Inner Sleeping Person */}
+            {isHorizontal ? (
+              <>
+                <Rect
+                  x={12}
+                  y={12}
+                  width={Math.min(w * 0.16, 45)}
+                  height={d - 24}
+                  fill="#f43f5e"
+                  cornerRadius={4}
+                />
+                <Circle
+                  x={12 + Math.min(w * 0.16, 45) / 2}
+                  y={d / 2}
+                  radius={Math.min(d * 0.22, 16)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.5}
+                />
+                <Rect
+                  x={w * 0.34}
+                  y={10}
+                  width={w - w * 0.34 - 10}
+                  height={d - 20}
+                  fill="#9f1239"
+                  stroke="#f472b6"
+                  strokeWidth={1}
+                  cornerRadius={[0, 4, 4, 0]}
+                />
+                <Line
+                  points={[w * 0.34, 10, w * 0.34, d - 10]}
+                  stroke="#fbcfe8"
+                  strokeWidth={2}
+                />
+              </>
+            ) : (
+              <>
+                <Rect
+                  x={12}
+                  y={12}
+                  width={w - 24}
+                  height={Math.min(d * 0.16, 45)}
+                  fill="#f43f5e"
+                  cornerRadius={4}
+                />
+                <Circle
+                  x={w / 2}
+                  y={12 + Math.min(d * 0.16, 45) / 2}
+                  radius={Math.min(w * 0.22, 16)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.5}
+                />
+                <Rect
+                  x={10}
+                  y={d * 0.34}
+                  width={w - 20}
+                  height={d - d * 0.34 - 10}
+                  fill="#9f1239"
+                  stroke="#f472b6"
+                  strokeWidth={1}
+                  cornerRadius={[0, 0, 4, 4]}
+                />
+                <Line
+                  points={[10, d * 0.34, w - 10, d * 0.34]}
+                  stroke="#fbcfe8"
+                  strokeWidth={2}
+                />
+              </>
+            )}
+          </>
+        );
+      }
+
+      case 'people-sleeping-double': {
+        const isHorizontal = w >= d;
+
+        return (
+          <>
+            {/* Double Floor Bed Base */}
+            <Rect
+              width={w}
+              height={d}
+              fill="#4c0519"
+              stroke={strokeColor}
+              strokeWidth={strokeWidth}
+              cornerRadius={6}
+            />
+            {isHorizontal ? (
+              <>
+                {/* 2 Pillows Side by Side on Left */}
+                <Rect
+                  x={8}
+                  y={8}
+                  width={Math.min(w * 0.16, 45)}
+                  height={(d - 24) / 2}
+                  fill="#f43f5e"
+                  cornerRadius={3}
+                />
+                <Circle
+                  x={8 + Math.min(w * 0.16, 45) / 2}
+                  y={8 + (d - 24) / 4}
+                  radius={Math.min(d * 0.14, 15)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.2}
+                />
+                <Rect
+                  x={8}
+                  y={16 + (d - 24) / 2}
+                  width={Math.min(w * 0.16, 45)}
+                  height={(d - 24) / 2}
+                  fill="#f43f5e"
+                  cornerRadius={3}
+                />
+                <Circle
+                  x={8 + Math.min(w * 0.16, 45) / 2}
+                  y={16 + (3 * (d - 24)) / 4}
+                  radius={Math.min(d * 0.14, 15)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.2}
+                />
+                {/* Shared Blanket */}
+                <Rect
+                  x={w * 0.35}
+                  y={8}
+                  width={w - w * 0.35 - 8}
+                  height={d - 16}
+                  fill="#831843"
+                  stroke="#f472b6"
+                  strokeWidth={1}
+                  cornerRadius={[0, 4, 4, 0]}
+                />
+                <Line
+                  points={[w * 0.35, 8, w * 0.35, d - 8]}
+                  stroke="#fbcfe8"
+                  strokeWidth={2}
+                />
+                {/* Center Divider line on blanket */}
+                <Line
+                  points={[w * 0.35, d / 2, w - 8, d / 2]}
+                  stroke="rgba(251, 207, 232, 0.4)"
+                  strokeWidth={1}
+                  dash={[4, 4]}
+                />
+              </>
+            ) : (
+              <>
+                {/* 2 Pillows Side by Side on Top */}
+                <Rect
+                  x={8}
+                  y={8}
+                  width={(w - 24) / 2}
+                  height={Math.min(d * 0.16, 45)}
+                  fill="#f43f5e"
+                  cornerRadius={3}
+                />
+                <Circle
+                  x={8 + (w - 24) / 4}
+                  y={8 + Math.min(d * 0.16, 45) / 2}
+                  radius={Math.min(w * 0.14, 15)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.2}
+                />
+                <Rect
+                  x={16 + (w - 24) / 2}
+                  y={8}
+                  width={(w - 24) / 2}
+                  height={Math.min(d * 0.16, 45)}
+                  fill="#f43f5e"
+                  cornerRadius={3}
+                />
+                <Circle
+                  x={16 + (3 * (w - 24)) / 4}
+                  y={8 + Math.min(d * 0.16, 45) / 2}
+                  radius={Math.min(w * 0.14, 15)}
+                  fill="#fff1f2"
+                  stroke="#be185d"
+                  strokeWidth={1.2}
+                />
+                {/* Shared Blanket */}
+                <Rect
+                  x={8}
+                  y={d * 0.35}
+                  width={w - 16}
+                  height={d - d * 0.35 - 8}
+                  fill="#831843"
+                  stroke="#f472b6"
+                  strokeWidth={1}
+                  cornerRadius={[0, 0, 4, 4]}
+                />
+                <Line
+                  points={[8, d * 0.35, w - 8, d * 0.35]}
+                  stroke="#fbcfe8"
+                  strokeWidth={2}
+                />
+                {/* Center Divider line on blanket */}
+                <Line
+                  points={[w / 2, d * 0.35, w / 2, d - 8]}
+                  stroke="rgba(251, 207, 232, 0.4)"
+                  strokeWidth={1}
+                  dash={[4, 4]}
+                />
+              </>
+            )}
+          </>
+        );
+      }
+
       default: {
         return (
           <Rect
@@ -535,9 +1013,23 @@ export default function FurnitureItem({
         {w >= 30 && d >= 20 && (
           <Text
             text={item.name}
-            x={2}
-            y={d / 2 - 6}
-            width={w - 4}
+            x={
+              item.symbol === 'person-sleeping' && w >= d
+                ? w * 0.35
+                : 2
+            }
+            y={
+              item.symbol === 'person-standing'
+                ? d - 14
+                : item.symbol === 'person-sleeping' && d > w
+                ? d * 0.55
+                : d / 2 - 6
+            }
+            width={
+              item.symbol === 'person-sleeping' && w >= d
+                ? w * 0.6
+                : w - 4
+            }
             align="center"
             fontSize={Math.max(Math.min(w * 0.13, 10), 8)}
             fontFamily="Inter, sans-serif"
