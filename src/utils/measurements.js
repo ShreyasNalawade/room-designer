@@ -1,5 +1,6 @@
 import { getItemCorners } from './collision';
 import { formatMeasurement, calculateRoomMetrics } from './units';
+import { getRoomWallDirections, getRoomHeadingAngle } from './orientation';
 
 /**
  * Calculate accurate distance from an item's outer edges to the room's 4 walls (North, South, West, East)
@@ -41,13 +42,12 @@ export function calculateWallClearances(item, room, unitKey = 'm') {
   const northWallY = -halfL;
   const southWallY = halfL;
 
-  // North distance = item top to North wall
-  const northMm = Math.round(minY - northWallY);
-  // South distance = item bottom to South wall
-  const southMm = Math.round(southWallY - maxY);
+  // Distance from item edges to the 4 physical room boundaries (top, bottom, left, right)
+  const topDist = Math.round(minY - northWallY);
+  const bottomDist = Math.round(southWallY - maxY);
 
-  let westMm;
-  let eastMm;
+  let leftDist;
+  let rightDist;
 
   if (room.shape === 'trapezoid') {
     const topW = room.topWidthMm || 4000;
@@ -59,14 +59,28 @@ export function calculateWallClearances(item, room, unitKey = 'm') {
     const leftWallX = -widthAtY / 2;
     const rightWallX = widthAtY / 2;
 
-    westMm = Math.round(minX - leftWallX);
-    eastMm = Math.round(rightWallX - maxX);
+    leftDist = Math.round(minX - leftWallX);
+    rightDist = Math.round(rightWallX - maxX);
   } else {
     const roomWidth = room.widthMm || 6000;
     const halfW = roomWidth / 2;
-    westMm = Math.round(minX - (-halfW));
-    eastMm = Math.round(halfW - maxX);
+    leftDist = Math.round(minX - (-halfW));
+    rightDist = Math.round(halfW - maxX);
   }
+
+  // Dynamic cardinal mapping according to room's compass orientation
+  const wallDirs = getRoomWallDirections(getRoomHeadingAngle(room));
+  const distByCode = {
+    [wallDirs.top.code]: topDist,
+    [wallDirs.bottom.code]: bottomDist,
+    [wallDirs.left.code]: leftDist,
+    [wallDirs.right.code]: rightDist,
+  };
+
+  const northMm = distByCode['N'] ?? distByCode['NE'] ?? distByCode['NW'] ?? topDist;
+  const southMm = distByCode['S'] ?? distByCode['SE'] ?? distByCode['SW'] ?? bottomDist;
+  const westMm = distByCode['W'] ?? distByCode['NW'] ?? distByCode['SW'] ?? leftDist;
+  const eastMm = distByCode['E'] ?? distByCode['NE'] ?? distByCode['SE'] ?? rightDist;
 
   const itemWidthMm = item.widthMm || 800;
   const itemLengthMm = item.depthMm || item.heightMm || 600;
@@ -76,10 +90,19 @@ export function calculateWallClearances(item, room, unitKey = 'm') {
     southMm,
     westMm,
     eastMm,
+    topDist,
+    bottomDist,
+    leftDist,
+    rightDist,
+    wallDirs,
     northStr: formatMeasurement(northMm, unitKey),
     southStr: formatMeasurement(southMm, unitKey),
     westStr: formatMeasurement(westMm, unitKey),
     eastStr: formatMeasurement(eastMm, unitKey),
+    topStr: formatMeasurement(topDist, unitKey),
+    bottomStr: formatMeasurement(bottomDist, unitKey),
+    leftStr: formatMeasurement(leftDist, unitKey),
+    rightStr: formatMeasurement(rightDist, unitKey),
     itemWidthStr: formatMeasurement(itemWidthMm, unitKey),
     itemLengthStr: formatMeasurement(itemLengthMm, unitKey),
     boundingBox: { minX, maxX, minY, maxY, centerX, centerY },

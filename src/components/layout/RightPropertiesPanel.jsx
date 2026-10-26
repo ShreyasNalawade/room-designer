@@ -19,11 +19,19 @@ import {
   BedDouble,
   BrickWall,
   Plus,
+  Utensils,
+  FlipHorizontal,
+  FlipVertical,
 } from 'lucide-react';
 import { UNITS } from '../../constants/units';
 import { formatMeasurement, calculateRoomMetrics, fromMm, toMm } from '../../utils/units';
 import { calculateWallClearances, calculateSpaceUtilization } from '../../utils/measurements';
-import { getHeadingDirection } from '../../utils/orientation';
+import {
+  getHeadingDirection,
+  getRoomWallDirections,
+  getRotationForWallDirection,
+  getRoomHeadingAngle,
+} from '../../utils/orientation';
 
 export default function RightPropertiesPanel({
   room,
@@ -38,6 +46,9 @@ export default function RightPropertiesPanel({
   onDeselect,
   onRotateRoom,
   onSetRotation,
+  onSetCompassHeading,
+  onRotateLayout,
+  onFlipLayout,
   totalItemsCount = 0,
   isMobileDrawer = false,
   onClose,
@@ -80,16 +91,22 @@ export default function RightPropertiesPanel({
     const adjustWallDistance = (dir, deltaDisplay) => {
       if (isLocked) return;
       const deltaMm = toMm(deltaDisplay, unit);
-      // North: moving away from North wall increases Y (moves South)
-      // Moving closer to North wall decreases Y (moves North)
-      if (dir === 'north') {
+      const code = dir.charAt(0).toUpperCase(); // 'N', 'S', 'W', 'E'
+      const wallDirs = clearances.wallDirs || getRoomWallDirections(room.rotation || 0);
+
+      if (wallDirs.top.code === code) {
         onChangeItem({ ...selectedItem, y: (selectedItem.y || 0) + deltaMm });
-      } else if (dir === 'south') {
+      } else if (wallDirs.bottom.code === code) {
         onChangeItem({ ...selectedItem, y: (selectedItem.y || 0) - deltaMm });
-      } else if (dir === 'west') {
+      } else if (wallDirs.left.code === code) {
         onChangeItem({ ...selectedItem, x: (selectedItem.x || 0) + deltaMm });
-      } else if (dir === 'east') {
+      } else if (wallDirs.right.code === code) {
         onChangeItem({ ...selectedItem, x: (selectedItem.x || 0) - deltaMm });
+      } else {
+        if (dir === 'north') onChangeItem({ ...selectedItem, y: (selectedItem.y || 0) + deltaMm });
+        else if (dir === 'south') onChangeItem({ ...selectedItem, y: (selectedItem.y || 0) - deltaMm });
+        else if (dir === 'west') onChangeItem({ ...selectedItem, x: (selectedItem.x || 0) + deltaMm });
+        else if (dir === 'east') onChangeItem({ ...selectedItem, x: (selectedItem.x || 0) - deltaMm });
       }
     };
 
@@ -1242,88 +1259,242 @@ export default function RightPropertiesPanel({
         </div>
 
         {/* Room Orientation & Compass Direction */}
-        <div className="space-y-3 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Compass className="w-4 h-4 text-rose-400" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-200">
-                Orientation & Compass
-              </span>
-            </div>
-            <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-950/80 border border-rose-800/60 px-2 py-0.5 rounded-full">
-              {room.rotation || 0}° {getHeadingDirection(room.rotation || 0).code}
-            </span>
-          </div>
+        {(() => {
+          const headingAngle = getRoomHeadingAngle(room);
+          const currentHeading = getHeadingDirection(headingAngle);
+          const currentWallDirs = getRoomWallDirections(headingAngle);
+          const isBottomWest = currentWallDirs.bottom.code === 'W';
+          const isBottomSouth = currentWallDirs.bottom.code === 'S';
+          const isBottomEast = currentWallDirs.bottom.code === 'E';
+          const isBottomNorth = currentWallDirs.bottom.code === 'N';
 
-          <div className="text-[11px] text-slate-400 flex justify-between items-center">
-            <span>Room Orientation:</span>
-            <span className="font-semibold text-cyan-400">
-              Facing {getHeadingDirection(room.rotation || 0).label}
-            </span>
-          </div>
+          const handleApplyDirection = (targetDeg) => {
+            if (onSetCompassHeading) {
+              onSetCompassHeading(targetDeg);
+            } else if (onSetRotation) {
+              onSetRotation(targetDeg);
+            }
+          };
 
-          {/* Quick Snap Buttons */}
-          <div className="grid grid-cols-4 gap-1.5">
-            {[
-              { code: 'N', deg: 0, label: 'North' },
-              { code: 'E', deg: 90, label: 'East' },
-              { code: 'S', deg: 180, label: 'South' },
-              { code: 'W', deg: 270, label: 'West' },
-            ].map(({ code, deg, label }) => {
-              const isSelected = (room.rotation || 0) === deg;
-              return (
+          return (
+            <div className="space-y-3 bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-rose-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                    Orientation & Vastu Compass
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-950/80 border border-rose-800/60 px-2 py-0.5 rounded-full">
+                  {headingAngle}° {currentHeading.code}
+                </span>
+              </div>
+
+              {/* Kitchen & Wall Window (Bottom Wall) Direction Presets */}
+              <div className="p-2.5 rounded-lg bg-slate-900/90 border border-cyan-900/60 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="flex items-center gap-1.5 text-cyan-300">
+                    <Utensils className="w-3.5 h-3.5 text-cyan-400" />
+                    Kitchen & Window Wall Facing:
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-cyan-400">
+                    {currentWallDirs.bottom.label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  Select which cardinal direction your kitchen (bottom wall) faces in your real home:
+                </p>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {/* West (90° room rotation) */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDirection(getRotationForWallDirection('bottom', 'W'))}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                      isBottomWest
+                        ? 'bg-gradient-to-r from-cyan-600 to-sky-600 text-white border-cyan-400 shadow-md shadow-cyan-600/30'
+                        : 'bg-slate-950 border-slate-800 text-cyan-300 hover:bg-slate-800 hover:border-cyan-500'
+                    }`}
+                    title="Orient kitchen and wall window on the WEST wall (90° angle)"
+                  >
+                    <span>◀ West Wall</span>
+                    <span className="text-[10px] font-mono opacity-80">{isBottomWest ? '✓ Active' : '90°'}</span>
+                  </button>
+
+                  {/* South (0° room rotation) */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDirection(getRotationForWallDirection('bottom', 'S'))}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-semibold transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                      isBottomSouth
+                        ? 'bg-slate-800 text-white border-slate-500 shadow'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                    }`}
+                    title="Orient bottom wall facing South (0° angle)"
+                  >
+                    <span>▼ South Wall</span>
+                    <span className="text-[10px] font-mono opacity-60">{isBottomSouth ? '✓ Active' : '0°'}</span>
+                  </button>
+
+                  {/* East (270° room rotation) */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDirection(getRotationForWallDirection('bottom', 'E'))}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-semibold transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                      isBottomEast
+                        ? 'bg-slate-800 text-white border-slate-500 shadow'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                    }`}
+                    title="Orient bottom wall facing East (270° angle)"
+                  >
+                    <span>▶ East Wall</span>
+                    <span className="text-[10px] font-mono opacity-60">{isBottomEast ? '✓ Active' : '270°'}</span>
+                  </button>
+
+                  {/* North (180° room rotation) */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDirection(getRotationForWallDirection('bottom', 'N'))}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-semibold transition flex items-center justify-between cursor-pointer active:scale-95 ${
+                      isBottomNorth
+                        ? 'bg-slate-800 text-white border-slate-500 shadow'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                    }`}
+                    title="Orient bottom wall facing North (180° angle)"
+                  >
+                    <span>▲ North Wall</span>
+                    <span className="text-[10px] font-mono opacity-60">{isBottomNorth ? '✓ Active' : '180°'}</span>
+                  </button>
+                </div>
+
+                {/* Wall directions summary */}
+                <div className="pt-1.5 border-t border-slate-800 grid grid-cols-2 gap-1 text-[10px] font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Top Wall:</span>
+                    <span className={currentWallDirs.top.code === 'N' ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                      {currentWallDirs.top.label}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Bottom Wall:</span>
+                    <span className={currentWallDirs.bottom.code === 'W' ? 'text-cyan-400 font-bold' : 'text-slate-300'}>
+                      {currentWallDirs.bottom.label}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Left Wall:</span>
+                    <span className={currentWallDirs.left.code === 'N' ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                      {currentWallDirs.left.label}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Right Wall:</span>
+                    <span className={currentWallDirs.right.code === 'N' ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                      {currentWallDirs.right.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Angle Slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Orientation Angle:</span>
+                  <span className="font-mono text-cyan-400 font-bold">{headingAngle}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="359"
+                  step="5"
+                  value={headingAngle}
+                  onChange={(e) => handleApplyDirection(parseInt(e.target.value, 10))}
+                  className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* Quick Rotate Buttons */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800/80">
                 <button
-                  key={code}
                   type="button"
-                  onClick={() => onSetRotation?.(deg)}
-                  title={`Align Room Facing ${label} (${deg}°)`}
-                  className={`py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center ${
-                    isSelected
-                      ? code === 'N'
-                        ? 'bg-rose-950/60 border-rose-500 text-rose-300'
-                        : 'bg-cyan-950/60 border-cyan-500 text-cyan-300'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                  }`}
+                  onClick={() => onRotateRoom?.(-90)}
+                  title="Rotate Entire Room 90° Counter-Clockwise"
+                  className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
                 >
-                  <span>{code}</span>
-                  <span className="text-[9px] font-normal opacity-70">{deg}°</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>-90°</span>
                 </button>
-              );
-            })}
-          </div>
 
-          {/* Quick Rotate Buttons */}
-          <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={() => onRotateRoom?.(-90)}
-              title="Rotate Entire Room 90° Counter-Clockwise"
-              className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
-              <span>-90°</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => onRotateRoom?.(90)}
+                  title="Rotate Entire Room 90° Clockwise"
+                  className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>+90°</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => onRotateRoom?.(90)}
-              title="Rotate Entire Room 90° Clockwise"
-              className="flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
-            >
-              <RotateCw className="w-3.5 h-3.5 text-cyan-400" />
-              <span>+90°</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => onSetRotation?.(0)}
+                  title="Reset Room to True North (0°)"
+                  className="flex items-center justify-center py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-rose-400 transition cursor-pointer active:scale-95 font-mono"
+                >
+                  Reset 0°
+                </button>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onSetRotation?.(0)}
-              title="Reset Room to True North (0°)"
-              className="flex items-center justify-center py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-rose-400 transition cursor-pointer active:scale-95 font-mono"
-            >
-              Reset 0°
-            </button>
-          </div>
-        </div>
+              {/* Physical Floor Plan Turn / Flip Tools */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                  Turn / Mirror Floor Plan Drawing:
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onRotateLayout?.(-90)}
+                    className="py-1 px-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
+                    title="Turn layout 90° counter-clockwise"
+                  >
+                    <RotateCcw className="w-3 h-3 text-indigo-400" />
+                    <span>Turn -90°</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRotateLayout?.(90)}
+                    className="py-1 px-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
+                    title="Turn layout 90° clockwise"
+                  >
+                    <RotateCw className="w-3 h-3 text-indigo-400" />
+                    <span>Turn +90°</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onFlipLayout?.('horizontal')}
+                    className="py-1 px-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
+                    title="Mirror layout horizontally (Left ⇄ Right)"
+                  >
+                    <FlipHorizontal className="w-3 h-3 text-indigo-400" />
+                    <span>Flip Horiz</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onFlipLayout?.('vertical')}
+                    className="py-1 px-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer"
+                    title="Mirror layout vertically (Top ⇅ Bottom)"
+                  >
+                    <FlipVertical className="w-3 h-3 text-indigo-400" />
+                    <span>Flip Vert</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Dimensions Summary */}
         <div className="space-y-2">

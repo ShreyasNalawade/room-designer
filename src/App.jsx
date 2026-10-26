@@ -23,7 +23,7 @@ import {
   DEFAULT_STARTER_ROOM,
 } from './utils/projectStorage';
 import { DEFAULT_UNIT } from './constants/units';
-import { rotateRoom, setRoomRotation } from './utils/orientation';
+import { rotateRoom, setRoomRotation, setCompassHeading, rotatePhysicalLayout, flipPhysicalLayout } from './utils/orientation';
 import { useDesignHistory } from './utils/useDesignHistory';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -356,6 +356,31 @@ export default function App() {
     setRoom((prev) => setRoomRotation(prev, targetDeg));
   }, [setRoom]);
 
+  // Set compass direction heading (cardinal orientation of home without turning canvas)
+  const handleSetCompassHeading = useCallback((targetDeg = 0) => {
+    setRoom((prev) => setCompassHeading(prev, targetDeg));
+  }, [setRoom]);
+
+  // Physically rotate entire layout (room geometry + all placed items)
+  const handleRotateLayout = useCallback((deltaDeg = 90) => {
+    const res = rotatePhysicalLayout(room, items, deltaDeg);
+    setRoomAndItems(res.room, res.items);
+    setToast({
+      message: `Layout physically rotated ${deltaDeg > 0 ? `+${deltaDeg}°` : `${deltaDeg}°`}.`,
+      type: 'info',
+    });
+  }, [room, items, setRoomAndItems]);
+
+  // Physically flip / mirror entire layout across horizontal or vertical axis
+  const handleFlipLayout = useCallback((axis = 'horizontal') => {
+    const res = flipPhysicalLayout(room, items, axis);
+    setRoomAndItems(res.room, res.items);
+    setToast({
+      message: `Layout flipped ${axis}.`,
+      type: 'info',
+    });
+  }, [room, items, setRoomAndItems]);
+
   // Add new furniture component from catalog into room
   const handleAddFurnitureItem = (catalogItem) => {
     const count = items.length;
@@ -569,6 +594,9 @@ export default function App() {
             onCursorMove={setCursorCoord}
             onRotateRoom={handleRotateRoom}
             onSetRotation={handleSetRoomRotation}
+            onSetCompassHeading={handleSetCompassHeading}
+            onRotateLayout={handleRotateLayout}
+            onFlipLayout={handleFlipLayout}
             onUndo={handleUndo}
             onRedo={handleRedo}
             canUndo={canUndo}
@@ -610,6 +638,9 @@ export default function App() {
           onDeselect={() => setSelectedId(null)}
           onRotateRoom={handleRotateRoom}
           onSetRotation={handleSetRoomRotation}
+          onSetCompassHeading={handleSetCompassHeading}
+          onRotateLayout={handleRotateLayout}
+          onFlipLayout={handleFlipLayout}
           totalItemsCount={items.length}
           onAddFurnitureItem={handleAddFurnitureItem}
         />
@@ -673,6 +704,9 @@ export default function App() {
               totalItemsCount={items.length}
               onRotateRoom={handleRotateRoom}
               onSetRotation={handleSetRoomRotation}
+              onSetCompassHeading={handleSetCompassHeading}
+              onRotateLayout={handleRotateLayout}
+              onFlipLayout={handleFlipLayout}
               isMobileDrawer={true}
               onClose={() => setActiveDrawer(null)}
               onAddFurnitureItem={handleAddFurnitureItem}

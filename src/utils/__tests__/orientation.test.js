@@ -2,8 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   CARDINAL_DIRECTIONS,
   getHeadingDirection,
+  getRoomWallDirections,
+  getRotationForWallDirection,
   rotateRoom,
   setRoomRotation,
+  getRoomHeadingAngle,
+  setCompassHeading,
+  rotatePhysicalLayout,
+  flipPhysicalLayout,
 } from '../orientation';
 
 describe('Orientation and Compass utilities', () => {
@@ -89,6 +95,81 @@ describe('Orientation and Compass utilities', () => {
       expect(setRoomRotation(baseRoom, 270).rotation).toBe(270);
       expect(setRoomRotation(baseRoom, 450).rotation).toBe(90);
       expect(setRoomRotation(baseRoom, -90).rotation).toBe(270);
+    });
+  });
+
+  describe('getRoomHeadingAngle and setCompassHeading', () => {
+    it('extracts compassHeading preferentially over rotation', () => {
+      expect(getRoomHeadingAngle({ rotation: 0, compassHeading: 90 })).toBe(90);
+      expect(getRoomHeadingAngle({ rotation: 180 })).toBe(180);
+      expect(getRoomHeadingAngle(null)).toBe(0);
+    });
+
+    it('sets compassHeading without modifying room canvas rotation', () => {
+      const room = { id: 'r1', rotation: 0, compassHeading: 0 };
+      const updated = setCompassHeading(room, 90);
+      expect(updated.compassHeading).toBe(90);
+      expect(updated.rotation).toBe(0);
+    });
+  });
+
+  describe('getRoomWallDirections and getRotationForWallDirection', () => {
+    it('returns default cardinal wall directions at 0 degrees', () => {
+      const dirs = getRoomWallDirections(0);
+      expect(dirs.top.code).toBe('N');
+      expect(dirs.bottom.code).toBe('S');
+      expect(dirs.left.code).toBe('W');
+      expect(dirs.right.code).toBe('E');
+    });
+
+    it('correctly maps Bottom Wall to West when rotation is 90 degrees', () => {
+      const dirs = getRoomWallDirections(90);
+      expect(dirs.bottom.code).toBe('W'); // Kitchen at bottom is now West!
+      expect(dirs.top.code).toBe('E');
+      expect(dirs.left.code).toBe('N');
+      expect(dirs.right.code).toBe('S');
+    });
+
+    it('calculates the needed rotation for any wall to face a target direction', () => {
+      // User wants bottom wall to face West ('W')
+      expect(getRotationForWallDirection('bottom', 'W')).toBe(90);
+      // User wants bottom wall to face North ('N')
+      expect(getRotationForWallDirection('bottom', 'N')).toBe(180);
+      // User wants bottom wall to face East ('E')
+      expect(getRotationForWallDirection('bottom', 'E')).toBe(270);
+      // User wants bottom wall to face South ('S')
+      expect(getRotationForWallDirection('bottom', 'S')).toBe(0);
+    });
+  });
+
+  describe('rotatePhysicalLayout & flipPhysicalLayout', () => {
+    const testRoom = {
+      id: 'r1',
+      shape: 'rectangle',
+      widthMm: 4000,
+      lengthMm: 6000,
+    };
+    const testItems = [
+      { id: 'kitchen-1', x: 0, y: 2500, rotation: 0 }, // Near bottom wall
+    ];
+
+    it('physically rotates room and items by 90 degrees', () => {
+      const res = rotatePhysicalLayout(testRoom, testItems, 90);
+      expect(res.room.widthMm).toBe(6000);
+      expect(res.room.lengthMm).toBe(4000);
+      expect(res.items[0].x).toBe(-2500); // Rotated to left wall
+      expect(res.items[0].y).toBe(0);
+      expect(res.items[0].rotation).toBe(90);
+    });
+
+    it('flips layout horizontally and vertically', () => {
+      const flippedH = flipPhysicalLayout(testRoom, [{ id: 'i1', x: 500, y: 1000, rotation: 45 }], 'horizontal');
+      expect(flippedH.items[0].x).toBe(-500);
+      expect(flippedH.items[0].y).toBe(1000);
+
+      const flippedV = flipPhysicalLayout(testRoom, [{ id: 'i1', x: 500, y: 1000, rotation: 0 }], 'vertical');
+      expect(flippedV.items[0].x).toBe(500);
+      expect(flippedV.items[0].y).toBe(-1000);
     });
   });
 });

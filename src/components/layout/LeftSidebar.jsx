@@ -21,7 +21,7 @@ import {
 import { UNITS } from '../../constants/units';
 import { fromMm, toMm, formatMeasurement } from '../../utils/units';
 import { ROOM_PRESETS } from '../../constants/presets';
-import { getHeadingDirection, rotateRoom, setRoomRotation } from '../../utils/orientation';
+import { getHeadingDirection, rotateRoom, setRoomRotation, getRoomHeadingAngle } from '../../utils/orientation';
 import FurnitureCatalog from './FurnitureCatalog';
 
 function DimensionControl({
@@ -432,14 +432,14 @@ export default function LeftSidebar({
                 <span>Orientation & Compass</span>
               </div>
               <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-rose-300">
-                {room.rotation || 0}° {getHeadingDirection(room.rotation || 0).code}
+                {getRoomHeadingAngle(room)}° {getHeadingDirection(getRoomHeadingAngle(room)).code}
               </span>
             </div>
 
             <div className="text-[11px] text-slate-400 flex items-center justify-between">
               <span>Facing Cardinal Direction:</span>
               <strong className="text-cyan-400 font-semibold">
-                {getHeadingDirection(room.rotation || 0).label}
+                {getHeadingDirection(getRoomHeadingAngle(room)).label}
               </strong>
             </div>
 
@@ -451,7 +451,7 @@ export default function LeftSidebar({
                 { code: 'S', deg: 180, label: 'South', color: 'cyan' },
                 { code: 'W', deg: 270, label: 'West', color: 'cyan' },
               ].map(({ code, deg, label }) => {
-                const isSelected = (room.rotation || 0) === deg;
+                const isSelected = getRoomHeadingAngle(room) === deg;
                 return (
                   <button
                     key={code}

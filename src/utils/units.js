@@ -1,4 +1,5 @@
 import { UNITS } from '../constants/units';
+import { getRoomWallDirections, getRoomHeadingAngle } from './orientation';
 
 /**
  * Convert canonical millimeters (mm) into user-facing display units
@@ -80,16 +81,18 @@ export function calculateRoomMetrics(room, unitKey = 'm') {
     const slantLen = Math.sqrt(length * length + dx * dx);
     const perimeterMm = topW + bottomW + 2 * slantLen;
 
+    const wallDirs = getRoomWallDirections(getRoomHeadingAngle(room));
+
     return {
       sqMeters: Number(sqMeters.toFixed(2)),
       sqFeet: Number(sqFeet.toFixed(2)),
       perimeterMm,
       perimeterStr: formatMeasurement(perimeterMm, unitKey),
       walls: [
-        { dir: 'Top Wall (North)', len: topW, orient: 'Parallel' },
-        { dir: 'Bottom Wall (South)', len: bottomW, orient: 'Parallel' },
-        { dir: 'Left Wall (West)', len: Math.round(slantLen), orient: 'Slanted' },
-        { dir: 'Right Wall (East)', len: Math.round(slantLen), orient: 'Slanted' },
+        { dir: `Top Wall (${wallDirs.top.label})`, len: topW, orient: 'Parallel', code: wallDirs.top.code },
+        { dir: `Bottom Wall (${wallDirs.bottom.label})`, len: bottomW, orient: 'Parallel', code: wallDirs.bottom.code },
+        { dir: `Left Wall (${wallDirs.left.label})`, len: Math.round(slantLen), orient: 'Slanted', code: wallDirs.left.code },
+        { dir: `Right Wall (${wallDirs.right.label})`, len: Math.round(slantLen), orient: 'Slanted', code: wallDirs.right.code },
       ],
     };
   }
@@ -100,6 +103,7 @@ export function calculateRoomMetrics(room, unitKey = 'm') {
   const sqMeters = (widthMm / 1000) * (lengthMm / 1000);
   const sqFeet = sqMeters * 10.7639104;
   const perimeterMm = 2 * (widthMm + lengthMm);
+  const wallDirs = getRoomWallDirections(getRoomHeadingAngle(room));
 
   return {
     sqMeters: Number(sqMeters.toFixed(2)),
@@ -107,10 +111,10 @@ export function calculateRoomMetrics(room, unitKey = 'm') {
     perimeterMm,
     perimeterStr: formatMeasurement(perimeterMm, unitKey),
     walls: [
-      { dir: 'North Wall', len: widthMm, orient: 'Horizontal' },
-      { dir: 'South Wall', len: widthMm, orient: 'Horizontal' },
-      { dir: 'East Wall', len: lengthMm, orient: 'Vertical' },
-      { dir: 'West Wall', len: lengthMm, orient: 'Vertical' },
+      { dir: `Top Wall (${wallDirs.top.label})`, len: widthMm, orient: 'Horizontal', code: wallDirs.top.code },
+      { dir: `Bottom Wall (${wallDirs.bottom.label})`, len: widthMm, orient: 'Horizontal', code: wallDirs.bottom.code },
+      { dir: `Right Wall (${wallDirs.right.label})`, len: lengthMm, orient: 'Vertical', code: wallDirs.right.code },
+      { dir: `Left Wall (${wallDirs.left.label})`, len: lengthMm, orient: 'Vertical', code: wallDirs.left.code },
     ],
   };
 }

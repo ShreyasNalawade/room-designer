@@ -5,6 +5,7 @@ import FurnitureItem from './FurnitureItem';
 import CompassRose from './CompassRose';
 import { formatMeasurement, calculateRoomMetrics } from '../../utils/units';
 import { calculateWallClearances } from '../../utils/measurements';
+import { getRoomWallDirections, getRoomHeadingAngle } from '../../utils/orientation';
 
 // Base conversion: 0.1 screen pixels per canonical millimeter (100px per meter)
 const BASE_PX_PER_MM = 0.1;
@@ -24,6 +25,9 @@ export default function RoomCanvas({
   onCursorMove,
   onRotateRoom,
   onSetRotation,
+  onSetCompassHeading,
+  onRotateLayout,
+  onFlipLayout,
   onUndo,
   onRedo,
   canUndo = false,
@@ -292,6 +296,14 @@ export default function RoomCanvas({
     return selectedItem ? calculateWallClearances(selectedItem, room, unit) : null;
   }, [selectedItem, room, unit]);
 
+  const headingAngle = getRoomHeadingAngle(room);
+
+  // Compute dynamic cardinal directions for each of the 4 room walls
+  const wallDirs = useMemo(
+    () => getRoomWallDirections(headingAngle),
+    [headingAngle]
+  );
+
   return (
     <div
       ref={containerRef}
@@ -299,9 +311,13 @@ export default function RoomCanvas({
     >
       {/* Interactive Compass Rose HUD (Top-Left) */}
       <CompassRose
-        rotation={room.rotation || 0}
+        rotation={headingAngle}
+        wallDirs={wallDirs}
         onRotateRoom={onRotateRoom}
         onSetRotation={onSetRotation}
+        onSetCompassHeading={onSetCompassHeading}
+        onRotateLayout={onRotateLayout}
+        onFlipLayout={onFlipLayout}
       />
 
       {/* Floating Canvas Controls Overlay */}
@@ -677,106 +693,142 @@ export default function RoomCanvas({
               </Group>
             </Group>
 
-            {/* Direction Wall Badges: Rotating with full room */}
-            {/* North Wall Badge */}
-            <Group y={-halfL - t - 14}>
-              <Rect
-                x={-46}
-                y={-9}
-                width={92}
-                height={18}
-                fill="#4c0519"
-                stroke="#f43f5e"
-                strokeWidth={1}
-                cornerRadius={4}
-              />
-              <Text
-                text="▲ NORTH WALL"
-                x={-46}
-                y={-5}
-                width={92}
-                align="center"
-                fontSize={9}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontStyle="700"
-                fill="#fecdd3"
-              />
-            </Group>
+            {/* Direction Wall Badges: Dynamic based on room's compass direction */}
+            {/* Top Wall Badge */}
+            {(() => {
+              const isNorth = wallDirs.top.code === 'N';
+              const isWest = wallDirs.top.code === 'W';
+              const fill = isNorth ? '#4c0519' : isWest ? '#082f49' : '#0f172a';
+              const stroke = isNorth ? '#f43f5e' : isWest ? '#0284c7' : '#475569';
+              const textFill = isNorth ? '#fecdd3' : isWest ? '#38bdf8' : '#94a3b8';
+              return (
+                <Group y={-halfL - t - 14}>
+                  <Rect
+                    x={-56}
+                    y={-9}
+                    width={112}
+                    height={18}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                    cornerRadius={4}
+                  />
+                  <Text
+                    text={`▲ ${wallDirs.top.label.toUpperCase()} WALL`}
+                    x={-56}
+                    y={-5}
+                    width={112}
+                    align="center"
+                    fontSize={9}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontStyle="700"
+                    fill={textFill}
+                  />
+                </Group>
+              );
+            })()}
 
-            {/* South Wall Badge */}
-            <Group y={halfL + t + (isTrapezoid ? 46 : 14)}>
-              <Rect
-                x={-46}
-                y={-9}
-                width={92}
-                height={18}
-                fill="#0f172a"
-                stroke="#64748b"
-                strokeWidth={1}
-                cornerRadius={4}
-              />
-              <Text
-                text="▼ SOUTH WALL"
-                x={-46}
-                y={-5}
-                width={92}
-                align="center"
-                fontSize={9}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontStyle="600"
-                fill="#94a3b8"
-              />
-            </Group>
+            {/* Bottom Wall Badge */}
+            {(() => {
+              const isNorth = wallDirs.bottom.code === 'N';
+              const isWest = wallDirs.bottom.code === 'W';
+              const fill = isNorth ? '#4c0519' : isWest ? '#082f49' : '#0f172a';
+              const stroke = isNorth ? '#f43f5e' : isWest ? '#0284c7' : '#475569';
+              const textFill = isNorth ? '#fecdd3' : isWest ? '#38bdf8' : '#94a3b8';
+              return (
+                <Group y={halfL + t + (isTrapezoid ? 46 : 14)}>
+                  <Rect
+                    x={-56}
+                    y={-9}
+                    width={112}
+                    height={18}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                    cornerRadius={4}
+                  />
+                  <Text
+                    text={`▼ ${wallDirs.bottom.label.toUpperCase()} WALL`}
+                    x={-56}
+                    y={-5}
+                    width={112}
+                    align="center"
+                    fontSize={9}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontStyle="700"
+                    fill={textFill}
+                  />
+                </Group>
+              );
+            })()}
 
-            {/* East Wall Badge */}
-            <Group x={maxWPx / 2 + t + 16} rotation={90}>
-              <Rect
-                x={-42}
-                y={-9}
-                width={84}
-                height={18}
-                fill="#0f172a"
-                stroke="#38bdf8"
-                strokeWidth={1}
-                cornerRadius={4}
-              />
-              <Text
-                text="EAST WALL ▶"
-                x={-42}
-                y={-5}
-                width={84}
-                align="center"
-                fontSize={9}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontStyle="600"
-                fill="#7dd3fc"
-              />
-            </Group>
+            {/* Right Wall Badge */}
+            {(() => {
+              const isNorth = wallDirs.right.code === 'N';
+              const isWest = wallDirs.right.code === 'W';
+              const fill = isNorth ? '#4c0519' : isWest ? '#082f49' : '#0f172a';
+              const stroke = isNorth ? '#f43f5e' : isWest ? '#0284c7' : '#475569';
+              const textFill = isNorth ? '#fecdd3' : isWest ? '#38bdf8' : '#94a3b8';
+              return (
+                <Group x={maxWPx / 2 + t + 16} rotation={90}>
+                  <Rect
+                    x={-52}
+                    y={-9}
+                    width={104}
+                    height={18}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                    cornerRadius={4}
+                  />
+                  <Text
+                    text={`${wallDirs.right.label.toUpperCase()} WALL ▶`}
+                    x={-52}
+                    y={-5}
+                    width={104}
+                    align="center"
+                    fontSize={9}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontStyle="700"
+                    fill={textFill}
+                  />
+                </Group>
+              );
+            })()}
 
-            {/* West Wall Badge */}
-            <Group x={-maxWPx / 2 - t - 56} rotation={-90}>
-              <Rect
-                x={-42}
-                y={-9}
-                width={84}
-                height={18}
-                fill="#0f172a"
-                stroke="#38bdf8"
-                strokeWidth={1}
-                cornerRadius={4}
-              />
-              <Text
-                text="◀ WEST WALL"
-                x={-42}
-                y={-5}
-                width={84}
-                align="center"
-                fontSize={9}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontStyle="600"
-                fill="#7dd3fc"
-              />
-            </Group>
+            {/* Left Wall Badge */}
+            {(() => {
+              const isNorth = wallDirs.left.code === 'N';
+              const isWest = wallDirs.left.code === 'W';
+              const fill = isNorth ? '#4c0519' : isWest ? '#082f49' : '#0f172a';
+              const stroke = isNorth ? '#f43f5e' : isWest ? '#0284c7' : '#475569';
+              const textFill = isNorth ? '#fecdd3' : isWest ? '#38bdf8' : '#94a3b8';
+              return (
+                <Group x={-maxWPx / 2 - t - 56} rotation={-90}>
+                  <Rect
+                    x={-52}
+                    y={-9}
+                    width={104}
+                    height={18}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                    cornerRadius={4}
+                  />
+                  <Text
+                    text={`◀ ${wallDirs.left.label.toUpperCase()} WALL`}
+                    x={-52}
+                    y={-5}
+                    width={104}
+                    align="center"
+                    fontSize={9}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontStyle="700"
+                    fill={textFill}
+                  />
+                </Group>
+              );
+            })()}
           </Group>
         </Layer>
 
@@ -857,7 +909,7 @@ export default function RoomCanvas({
                     shadowOpacity={0.6}
                   />
                   <Text
-                    text={`N: ${wallClearances.northStr}`}
+                    text={`${wallDirs.top.code}: ${wallClearances.topStr || wallClearances.northStr}`}
                     x={-48}
                     y={-6}
                     width={96}
@@ -926,7 +978,7 @@ export default function RoomCanvas({
                     shadowOpacity={0.6}
                   />
                   <Text
-                    text={`S: ${wallClearances.southStr}`}
+                    text={`${wallDirs.bottom.code}: ${wallClearances.bottomStr || wallClearances.southStr}`}
                     x={-48}
                     y={-6}
                     width={96}
@@ -989,7 +1041,7 @@ export default function RoomCanvas({
                       shadowOpacity={0.6}
                     />
                     <Text
-                      text={`W: ${wallClearances.westStr}`}
+                      text={`${wallDirs.left.code}: ${wallClearances.leftStr || wallClearances.westStr}`}
                       x={-48}
                       y={-6}
                       width={96}
@@ -1053,7 +1105,7 @@ export default function RoomCanvas({
                       shadowOpacity={0.6}
                     />
                     <Text
-                      text={`E: ${wallClearances.eastStr}`}
+                      text={`${wallDirs.right.code}: ${wallClearances.rightStr || wallClearances.eastStr}`}
                       x={-48}
                       y={-6}
                       width={96}
